@@ -40,6 +40,11 @@
         <button onclick="keluarAplikasi()" class="text-sm bg-white/20 px-2 py-1 rounded"><i class="fa fa-sign-out"></i></button>
     </header>
 
+    <!-- PESAN PENTING IZIN KAMERA -->
+    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-2 text-sm text-center">
+        <b>⚠️ Catatan:</b> Saat tombol diklik, pilih <b>"Izinkan"</b> jika Chrome minta akses kamera.
+    </div>
+
     <!-- MENU TAB NAVIGASI -->
     <div class="bg-white flex border-b sticky top-0 z-10 shadow-sm">
         <button class="tab-btn flex-1 py-3 text-center font-semibold text-blue-600 border-b-2 border-blue-600" onclick="bukaTab('transaksi', this)">
@@ -234,7 +239,7 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- LOGIKA KAMERA & SCAN (VERSI FINAL BISA BACA) --------------------
+// -------------------- LOGIKA KAMERA & SCAN (VERSI FINAL BERHASIL) --------------------
 function mulaiScan(dariHalaman) {
     hentikanScan(); // Pastikan kamera lain mati dulu
     
@@ -280,7 +285,11 @@ function mulaiScan(dariHalaman) {
             
             hentikanScan(); // Tutup kamera otomatis setelah baca
         }
-        // Jika error atau belum ada kode, diam saja
+        // Tampilkan pesan jika akses ditolak
+        if (error && error.name === 'NotAllowedError') {
+            alert("❌ Izin kamera DITOLAK! Ubah izin di pengaturan Chrome > Kamera > Izinkan.");
+            hentikanScan();
+        }
     }, {
         facingMode: tipeKamera, // Depan/Belakang
         width: { min: 640, ideal: 1280, max: 1920 },
