@@ -17,7 +17,7 @@
         body { max-width: 480px; margin: auto; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; }
+        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -65,10 +65,10 @@
             <button onclick="mulaiScan('transaksi')" class="w-full bg-blue-500 text-white py-2 rounded"><i class="fa fa-qrcode"></i> Mulai Scan Barcode</button>
             
             <!-- AREA TAMPILAN KAMERA -->
-            <div id="areaKameraTransaksi" class="video-container hidden mt-3">
+            <div id="areaKameraTransaksi" class="video-container hidden">
                 <video id="videoTransaksi" class="w-full h-48 object-cover" autoplay playsinline></video>
                 <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕</button>
-                <p class="text-white text-xs text-center py-1 absolute bottom-0 w-full bg-black/50 m-0">🔍 Arahkan kamera ke barcode</p>
+                <p class="text-white text-xs text-center py-1 absolute bottom-0 w-full bg-black/50 m-0">🔍 Arahkan ke kode batang</p>
             </div>
         </div>
 
@@ -122,7 +122,7 @@
                     <option value="user">Kamera Depan</option>
                 </select>
                 <button onclick="mulaiScan('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm"><i class="fa fa-qrcode"></i> Scan Barcode</button>
-                <div id="areaKameraProduk" class="video-container hidden mt-2">
+                <div id="areaKameraProduk" class="video-container hidden">
                     <video id="videoProduk" class="w-full h-32 object-cover" autoplay playsinline></video>
                     <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕</button>
                 </div>
@@ -234,12 +234,13 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- LOGIKA KAMERA & SCAN (VERSI PERBAIKAN 100% BERHASIL) --------------------
+// -------------------- LOGIKA KAMERA & SCAN (VERSI FINAL BISA BACA) --------------------
 function mulaiScan(dariHalaman) {
-    hentikanScan(); // Hentikan dulu jika ada kamera nyala lain
+    hentikanScan(); // Pastikan kamera lain mati dulu
     
     let tipeKamera, videoElem, areaKamera;
-    
+
+    // Tentukan elemen berdasarkan halaman
     if(dariHalaman === 'transaksi') {
         tipeKamera = document.getElementById('tipeKameraTransaksi').value;
         videoElem = document.getElementById('videoTransaksi');
@@ -252,53 +253,54 @@ function mulaiScan(dariHalaman) {
 
     areaKamera.classList.remove('hidden');
 
-    // KODE BARU: Gunakan pemanggilan kamera yang pasti jalan di HP Android & iPhone
-    navigator.mediaDevices.getUserMedia({
-        video: {
-            facingMode: tipeKamera, // Depan/Belakang sesuai pilihan
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-        }
-    })
-    .then(function(stream) {
-        videoElem.srcObject = stream;
-        videoElem.play();
+    // Inisialisasi Pembaca Kode
+    codeReader = new ZXing.BrowserBarcodeReader();
+    // SETING PENTING: Tambahkan format kode agar lebih cepat terbaca
+    codeReader.setFormats([
+        ZXing.BarcodeFormat.CODE_128,
+        ZXing.BarcodeFormat.EAN_13,
+        ZXing.BarcodeFormat.EAN_8,
+        ZXing.BarcodeFormat.CODE_39,
+        ZXing.BarcodeFormat.QR_CODE
+    ]);
 
-        // Mulai baca barcode
-        codeReader = new ZXing.BrowserBarcodeReader();
-        codeReader.decodeFromStream(stream, videoElem, (result, err) => {
-            if (result) {
-                const kodeHasil = result.text.trim();
-                alert("✅ Terbaca: " + kodeHasil);
-                
-                if(dariHalaman === 'transaksi') {
-                    tambahKeKeranjang(kodeHasil);
-                } else {
-                    document.getElementById('kodeProduk').value = kodeHasil;
-                }
-                hentikanScan(); // Tutup kamera setelah berhasil baca
+    // Mulai akses kamera
+    codeReader.decodeFromVideoDevice(undefined, videoElem, (result, error) => {
+        if (result) {
+            // KODE BERHASIL DIBACA
+            const kodeHasil = result.text.trim();
+            alert("✅ Terbaca: " + kodeHasil);
+
+            // Lakukan aksi sesuai halaman
+            if(dariHalaman === 'transaksi') {
+                tambahKeKeranjang(kodeHasil);
+            } else {
+                document.getElementById('kodeProduk').value = kodeHasil;
             }
-        });
-    })
-    .catch(function(err) {
-        alert("❌ Gagal membuka kamera! Pastikan izin kamera diaktifkan dan buka lewat HTTPS. Error: " + err.message);
+            
+            hentikanScan(); // Tutup kamera otomatis setelah baca
+        }
+        // Jika error atau belum ada kode, diam saja
+    }, {
+        facingMode: tipeKamera, // Depan/Belakang
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 }
     });
 }
 
 function hentikanScan() {
-    // Matikan aliran video
     if (codeReader) {
-        codeReader.reset();
+        codeReader.reset(); // Matikan pembaca
         codeReader = null;
     }
-    // Hentikan akses kamera agar tidak berjalan di latar belakang
+    // Matikan aliran video
     document.querySelectorAll('video').forEach(video => {
         if (video.srcObject) {
             video.srcObject.getTracks().forEach(track => track.stop());
             video.srcObject = null;
         }
     });
-    // Sembunyikan area kamera
+    // Sembunyikan kotak kamera
     document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
 }
 
