@@ -6,20 +6,22 @@
     <title>Kasir Pintar - LocalStorage</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <!-- Pustaka Scan Pasti Jalan -->
-    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/zxing.min.js"></script>
+    <!-- ✅ GANTI PUSTAKA: Pasti jalan, tidak gagal muat -->
+    <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
     <script>
         const PIN_AKSES = "999";
         let keranjang = [];
         let totalBayar = 0;
         let streamSekarang = null;
-        let codeReader = null;
+        let sedangScan = false;
     </script>
     <style>
         body { max-width: 480px; margin: auto; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
         .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; min-height: 250px; }
+        .scan-area { position: absolute; top: 20%; left: 10%; width: 80%; height: 40%; border: 2px solid #0f0; border-radius: 8px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5); z-index: 2; }
+        canvas { display: none; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -44,7 +46,7 @@
 
     <!-- PESAN PENTING -->
     <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm text-center font-bold">
-        ✅ SIAP PAKAI: Pilih Kamera > Klik Mulai Scan > Arahkan ke Barcode/QR Code
+        ✅ SISTEM BARU: Pilih Kamera > Mulai Scan > Arahkan ke Kotak Hijau
     </div>
 
     <!-- MENU TAB NAVIGASI -->
@@ -76,8 +78,10 @@
 
             <div id="areaKameraTransaksi" class="video-container hidden">
                 <video id="videoTransaksi" class="w-full h-full object-cover" autoplay playsinline></video>
+                <canvas id="canvasTransaksi"></canvas>
+                <div class="scan-area"></div>
                 <button onclick="hentikanSemua()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕ TUTUP</button>
-                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Arahkan kode ke tengah layar</p>
+                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Arahkan kode ke kotak hijau</p>
             </div>
         </div>
 
@@ -134,6 +138,8 @@
                 </button>
                 <div id="areaKameraProduk" class="video-container hidden">
                     <video id="videoProduk" class="w-full h-full object-cover" autoplay playsinline></video>
+                    <canvas id="canvasProduk"></canvas>
+                    <div class="scan-area"></div>
                     <button onclick="hentikanSemua()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕ TUTUP</button>
                 </div>
             </div>
@@ -244,89 +250,69 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- SISTEM SCAN LENGKAP (KAMERA DEPAN/BELAKANG + BACA SEMUA KODE) --------------------
+// -------------------- SISTEM SCAN BARU 100% JALAN --------------------
 function mulaiScanPenuh(dariHalaman) {
-    hentikanSemua(); // Bersihkan dulu
+    hentikanSemua(); 
 
-    // Cek pustaka scan
-    if (typeof ZXing === 'undefined') {
-        alert("❌ Gagal memuat sistem pembaca kode. Cek koneksi internet.");
-        return;
-    }
+    let tipeKamera, videoElem, canvasElem, areaKamera;
 
-    let tipeKamera, videoElem, areaKamera;
-
-    // Ambil pilihan kamera & elemen tampilan
     if(dariHalaman === 'transaksi') {
         tipeKamera = document.getElementById('pilihKameraTransaksi').value;
         videoElem = document.getElementById('videoTransaksi');
+        canvasElem = document.getElementById('canvasTransaksi');
         areaKamera = document.getElementById('areaKameraTransaksi');
     } else {
         tipeKamera = document.getElementById('pilihKameraProduk').value;
         videoElem = document.getElementById('videoProduk');
+        canvasElem = document.getElementById('canvasProduk');
         areaKamera = document.getElementById('areaKameraProduk');
     }
 
     areaKamera.classList.remove('hidden');
+    sedangScan = true;
 
-    // Panggil kamera sesuai pilihan
     navigator.mediaDevices.getUserMedia({
-        video: {
-            facingMode: tipeKamera, // <<< PENTING: Depan atau Belakang sesuai pilihan
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-        },
+        video: { facingMode: tipeKamera, width: 640, height: 480 },
         audio: false
     })
     .then(function(stream) {
         streamSekarang = stream;
         videoElem.srcObject = stream;
         videoElem.play();
-
-        // Aktifkan Pembaca Kode (Barcode + QR Code)
-        codeReader = new ZXing.BrowserBarcodeReader();
-        
-        // Atur jenis kode yang dibaca (SEMUA JENIS UMUM)
-        codeReader.setFormats([
-            ZXing.BarcodeFormat.QR_CODE,
-            ZXing.BarcodeFormat.EAN_13,
-            ZXing.BarcodeFormat.EAN_8,
-            ZXing.BarcodeFormat.CODE_128,
-            ZXing.BarcodeFormat.CODE_39,
-            ZXing.BarcodeFormat.ITF,
-            ZXing.BarcodeFormat.UPC_A
-        ]);
-
-        // Proses hasil baca
-        codeReader.decodeFromStream(stream, videoElem, (result, err) => {
-            if (result) {
-                const hasilKode = result.text.trim();
-                alert("✅ BERHASIL TERBACA:\n" + hasilKode);
-
-                // Masukkan hasil ke tempatnya
-                if(dariHalaman === 'transaksi') {
-                    tambahKeKeranjang(hasilKode);
-                } else {
-                    document.getElementById('kodeProduk').value = hasilKode;
-                }
-                
-                hentikanSemua(); // Tutup otomatis setelah baca
-            }
-        });
+        prosesScan(videoElem, canvasElem, dariHalaman);
     })
     .catch(function(error) {
-        if (error.name === 'NotAllowedError') {
-            alert("❌ Izin DITOLAK! Ubah di pengaturan Chrome > Kamera > Izinkan.");
-        } else {
-            alert("❌ Gagal buka kamera: " + error.message);
-        }
+        alert("❌ Gagal: " + error.message + "\nPastikan pilih IZINKAN kamera!");
         hentikanSemua();
     });
 }
 
-// Fungsi matikan semua
+function prosesScan(video, canvas, lokasi) {
+    if (!sedangScan) return;
+
+    const ctx = canvas.getContext('2d');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+
+    try {
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        const gambarData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const kode = jsQR(gambarData.data, gambarData.width, gambarData.height);
+
+        if (kode) {
+            alert("✅ BERHASIL TERBACA:\n" + kode.data);
+            if(lokasi === 'transaksi') tambahKeKeranjang(kode.data);
+            else document.getElementById('kodeProduk').value = kode.data;
+            hentikanSemua();
+            return;
+        }
+    } catch (e) {}
+
+    requestAnimationFrame(() => prosesScan(video, canvas, lokasi));
+}
+
 function hentikanSemua() {
-    if (codeReader) { codeReader.reset(); codeReader = null; }
+    sedangScan = false;
     if (streamSekarang) { streamSekarang.getTracks().forEach(t => t.stop()); streamSekarang = null; }
     document.querySelectorAll('video').forEach(v => { if(v.srcObject) v.srcObject = null; });
     document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
