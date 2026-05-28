@@ -6,11 +6,14 @@
     <title>Kasir Pintar - LocalStorage</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- Pustaka Scan Pasti Jalan -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/zxing.min.js"></script>
     <script>
         const PIN_AKSES = "999";
         let keranjang = [];
         let totalBayar = 0;
         let streamSekarang = null;
+        let codeReader = null;
     </script>
     <style>
         body { max-width: 480px; margin: auto; }
@@ -41,7 +44,7 @@
 
     <!-- PESAN PENTING -->
     <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm text-center font-bold">
-        ✅ CARA PAKAI: Klik tombol > Pilih IZINKAN > Kamera akan nyala!
+        ✅ SIAP PAKAI: Pilih Kamera > Klik Mulai Scan > Arahkan ke Barcode/QR Code
     </div>
 
     <!-- MENU TAB NAVIGASI -->
@@ -60,15 +63,21 @@
     <!-- =============== HALAMAN TRANSAKSI =============== -->
     <div id="transaksi" class="tab-content active p-4">
         <div class="bg-white rounded-lg shadow p-3 mb-4">
-            <button onclick="bukaKameraSaja('transaksi')" class="w-full bg-blue-500 text-white py-3 rounded font-bold text-lg">
-                <i class="fa fa-camera"></i> BUKA KAMERA (UJI COBA)
+            <!-- PILIH KAMERA -->
+            <label class="font-semibold text-sm">Pilih Kamera:</label>
+            <select id="pilihKameraTransaksi" class="w-full border p-2 rounded mt-1 mb-3">
+                <option value="environment">📷 Kamera Belakang (Utama)</option>
+                <option value="user">🤳 Kamera Depan (Selfie)</option>
+            </select>
+
+            <button onclick="mulaiScanPenuh('transaksi')" class="w-full bg-blue-500 text-white py-3 rounded font-bold text-lg">
+                <i class="fa fa-qrcode"></i> MULAI SCAN BARCODE / QR
             </button>
-            <p class="text-center text-xs text-gray-600 mt-1">*Hanya untuk cek apakah kamera nyala</p>
 
             <div id="areaKameraTransaksi" class="video-container hidden">
                 <video id="videoTransaksi" class="w-full h-full object-cover" autoplay playsinline></video>
-                <button onclick="tutupKamera()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕ TUTUP</button>
-                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">📷 Kamera Sedang Aktif</p>
+                <button onclick="hentikanSemua()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕ TUTUP</button>
+                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Arahkan kode ke tengah layar</p>
             </div>
         </div>
 
@@ -114,12 +123,18 @@
             <h3 class="font-bold text-lg mb-3">➕ Tambah Produk Baru</h3>
             
             <div class="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-200">
-                <button onclick="bukaKameraSaja('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm font-bold">
-                    <i class="fa fa-camera"></i> BUKA KAMERA
+                <label class="font-semibold text-sm">Pilih Kamera Scan:</label>
+                <select id="pilihKameraProduk" class="w-full border p-2 rounded mt-1 mb-2">
+                    <option value="environment">📷 Kamera Belakang</option>
+                    <option value="user">🤳 Kamera Depan</option>
+                </select>
+
+                <button onclick="mulaiScanPenuh('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm font-bold">
+                    <i class="fa fa-qrcode"></i> SCAN BARCODE UNTUK ISI KODE
                 </button>
                 <div id="areaKameraProduk" class="video-container hidden">
                     <video id="videoProduk" class="w-full h-full object-cover" autoplay playsinline></video>
-                    <button onclick="tutupKamera()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕ TUTUP</button>
+                    <button onclick="hentikanSemua()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕ TUTUP</button>
                 </div>
             </div>
 
@@ -229,61 +244,90 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- SISTEM KAMERA PALING DASAR (PASTI JALAN) --------------------
-function bukaKameraSaja(dariHalaman) {
-    tutupKamera(); // Pastikan mati dulu
+// -------------------- SISTEM SCAN LENGKAP (KAMERA DEPAN/BELAKANG + BACA SEMUA KODE) --------------------
+function mulaiScanPenuh(dariHalaman) {
+    hentikanSemua(); // Bersihkan dulu
 
-    let videoElem, areaKamera;
+    // Cek pustaka scan
+    if (typeof ZXing === 'undefined') {
+        alert("❌ Gagal memuat sistem pembaca kode. Cek koneksi internet.");
+        return;
+    }
+
+    let tipeKamera, videoElem, areaKamera;
+
+    // Ambil pilihan kamera & elemen tampilan
     if(dariHalaman === 'transaksi') {
+        tipeKamera = document.getElementById('pilihKameraTransaksi').value;
         videoElem = document.getElementById('videoTransaksi');
         areaKamera = document.getElementById('areaKameraTransaksi');
     } else {
+        tipeKamera = document.getElementById('pilihKameraProduk').value;
         videoElem = document.getElementById('videoProduk');
         areaKamera = document.getElementById('areaKameraProduk');
     }
 
     areaKamera.classList.remove('hidden');
 
-    // 📷 KODE PANGGIL KAMERA STANDAR DUNIA
+    // Panggil kamera sesuai pilihan
     navigator.mediaDevices.getUserMedia({
         video: {
-            facingMode: "environment", // Kamera belakang
+            facingMode: tipeKamera, // <<< PENTING: Depan atau Belakang sesuai pilihan
             width: { ideal: 1280 },
             height: { ideal: 720 }
         },
         audio: false
     })
     .then(function(stream) {
-        // BERHASIL! Kamera nyala
         streamSekarang = stream;
         videoElem.srcObject = stream;
         videoElem.play();
-        alert("✅ KAMERA BERHASIL NYALA!");
+
+        // Aktifkan Pembaca Kode (Barcode + QR Code)
+        codeReader = new ZXing.BrowserBarcodeReader();
+        
+        // Atur jenis kode yang dibaca (SEMUA JENIS UMUM)
+        codeReader.setFormats([
+            ZXing.BarcodeFormat.QR_CODE,
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.CODE_39,
+            ZXing.BarcodeFormat.ITF,
+            ZXing.BarcodeFormat.UPC_A
+        ]);
+
+        // Proses hasil baca
+        codeReader.decodeFromStream(stream, videoElem, (result, err) => {
+            if (result) {
+                const hasilKode = result.text.trim();
+                alert("✅ BERHASIL TERBACA:\n" + hasilKode);
+
+                // Masukkan hasil ke tempatnya
+                if(dariHalaman === 'transaksi') {
+                    tambahKeKeranjang(hasilKode);
+                } else {
+                    document.getElementById('kodeProduk').value = hasilKode;
+                }
+                
+                hentikanSemua(); // Tutup otomatis setelah baca
+            }
+        });
     })
     .catch(function(error) {
-        // GAGAL! Tampilkan alasan jelas
-        console.error("Error Kamera:", error);
         if (error.name === 'NotAllowedError') {
-            alert("❌ GAGAL: Anda MEMBLOKIR akses kamera.\n\nCara Memperbaiki:\n1. Tekan tombol 🔒 (Gembok) di sebelah kiri alamat web\n2. Pilih Izin / Permissions\n3. Ubah Kamera dari 'Blokir' menjadi 'IZINKAN / ALLOW'\n4. Muat ulang halaman");
-        } 
-        else if (error.name === 'NotFoundError') {
-            alert("❌ GAGAL: Kamera tidak ditemukan atau rusak di HP ini.");
+            alert("❌ Izin DITOLAK! Ubah di pengaturan Chrome > Kamera > Izinkan.");
+        } else {
+            alert("❌ Gagal buka kamera: " + error.message);
         }
-        else if (error.name === 'NotReadableError') {
-            alert("❌ GAGAL: Kamera sedang dipakai aplikasi lain atau ada kerusakan hardware. Tutup semua aplikasi lain lalu coba lagi.");
-        }
-        else {
-            alert("❌ GAGAL: " + error.message + "\nKemungkinan HP tidak mendukung.");
-        }
-        tutupKamera();
+        hentikanSemua();
     });
 }
 
-function tutupKamera() {
-    if (streamSekarang) {
-        streamSekarang.getTracks().forEach(track => track.stop());
-        streamSekarang = null;
-    }
+// Fungsi matikan semua
+function hentikanSemua() {
+    if (codeReader) { codeReader.reset(); codeReader = null; }
+    if (streamSekarang) { streamSekarang.getTracks().forEach(t => t.stop()); streamSekarang = null; }
     document.querySelectorAll('video').forEach(v => { if(v.srcObject) v.srcObject = null; });
     document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
 }
