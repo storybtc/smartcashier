@@ -1,1 +1,475 @@
-# smartcashier
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Pintar - LocalStorage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://unpkg.com/@zxing/library@0.19.1/dist/zxing.min.js"></script>
+    <script>
+        const PIN_AKSES = "999"; // PIN akses aplikasi
+        let codeReader;
+        let keranjang = [];
+        let totalBayar = 0;
+    </script>
+    <style>
+        body { max-width: 480px; margin: auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+    </style>
+</head>
+<body class="bg-gray-100">
+
+<!-- LAYAR LOGIN PIN -->
+<div id="layarLogin" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 w-full max-w-xs text-center shadow-lg">
+        <i class="fa fa-lock text-blue-600 text-4xl mb-3"></i>
+        <h2 class="text-xl font-bold mb-4">Masukkan PIN Akses</h2>
+        <input type="password" id="inputPin" maxlength="3" class="w-full border-2 border-blue-500 rounded-lg text-center text-2xl font-bold py-2 mb-4" placeholder="***">
+        <button onclick="cekPin()" class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">Buka Aplikasi</button>
+        <p class="text-xs text-gray-500 mt-2">PIN Bawaan: 999</p>
+    </div>
+</div>
+
+<!-- KONTEN UTAMA -->
+<div id="appUtama" class="hidden">
+    <header class="bg-blue-600 text-white p-4 shadow flex justify-between items-center">
+        <h1 class="text-xl font-bold">🏪 KASIR PINTAR</h1>
+        <button onclick="keluarAplikasi()" class="text-sm bg-white/20 px-2 py-1 rounded"><i class="fa fa-sign-out"></i></button>
+    </header>
+
+    <!-- MENU TAB NAVIGASI -->
+    <div class="bg-white flex border-b sticky top-0 z-10 shadow-sm">
+        <button class="tab-btn flex-1 py-3 text-center font-semibold text-blue-600 border-b-2 border-blue-600" onclick="bukaTab('transaksi', this)">
+            <i class="fa fa-shopping-cart"></i> Transaksi
+        </button>
+        <button class="tab-btn flex-1 py-3 text-center font-semibold text-gray-500" onclick="bukaTab('produk', this)">
+            <i class="fa fa-box"></i> Produk
+        </button>
+        <button class="tab-btn flex-1 py-3 text-center font-semibold text-gray-500" onclick="bukaTab('laporan', this)">
+            <i class="fa fa-file-text"></i> Laporan
+        </button>
+    </div>
+
+    <!-- =============== HALAMAN TRANSAKSI =============== -->
+    <div id="transaksi" class="tab-content active p-4">
+        <!-- PILIH KAMERA & SCAN -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <label class="font-semibold text-sm">Pilih Kamera Scan:</label>
+            <select id="tipeKameraTransaksi" class="w-full border p-2 rounded mt-1 mb-2">
+                <option value="environment">Kamera Belakang</option>
+                <option value="user">Kamera Depan</option>
+            </select>
+            <button onclick="mulaiScan('transaksi')" class="w-full bg-blue-500 text-white py-2 rounded"><i class="fa fa-qrcode"></i> Mulai Scan Barcode</button>
+            
+            <!-- AREA TAMPILAN KAMERA -->
+            <div id="areaKameraTransaksi" class="hidden mt-3 relative bg-black rounded-lg overflow-hidden">
+                <video id="videoTransaksi" class="w-full h-48 object-cover"></video>
+                <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">✕</button>
+                <p class="text-white text-xs text-center py-1">🔍 Arahkan kamera ke barcode</p>
+            </div>
+        </div>
+
+        <!-- CARI PRODUK -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <label class="font-semibold text-sm">Cari Produk (Nama / Kode):</label>
+            <div class="flex gap-2 mt-1">
+                <input type="text" id="kataCariTransaksi" class="flex-1 border p-2 rounded" placeholder="Contoh: A1 / Sabun...">
+                <button onclick="cariDanTampilkanProduk()" class="bg-green-500 text-white px-3 rounded">Cari</button>
+            </div>
+            <div id="hasilCariTransaksi" class="mt-2 max-h-32 overflow-y-auto text-sm"></div>
+        </div>
+
+        <!-- KERANJANG BELANJA -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <h3 class="font-bold text-lg mb-2">🛒 Keranjang</h3>
+            <div id="daftarKeranjang" class="space-y-1 text-sm mb-3 border-b pb-2">
+                <p class="text-gray-500 text-center py-2">Belum ada barang</p>
+            </div>
+            <div class="flex justify-between font-bold text-lg">
+                <span>TOTAL:</span>
+                <span id="labelTotal">Rp 0</span>
+            </div>
+        </div>
+
+        <!-- PEMBAYARAN -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <label class="font-semibold">Uang Diterima:</label>
+            <input type="number" id="uangBayar" class="w-full border p-2 rounded mt-1" placeholder="0" oninput="hitungKembalian()">
+            <div class="flex justify-between font-semibold text-lg mt-2">
+                <span>Kembalian:</span>
+                <span id="labelKembalian" class="text-green-600">Rp 0</span>
+            </div>
+            <button onclick="prosesTransaksi()" class="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold text-lg">
+                ✔ Simpan Transaksi
+            </button>
+        </div>
+    </div>
+
+    <!-- =============== HALAMAN INPUT PRODUK =============== -->
+    <div id="produk" class="tab-content p-4">
+        <!-- FORM TAMBAH PRODUK -->
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <h3 class="font-bold text-lg mb-3">➕ Tambah Produk Baru</h3>
+            
+            <!-- FITUR SCAN DI INPUT PRODUK -->
+            <div class="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-200">
+                <label class="font-semibold text-sm">Scan Barcode Isi Kode:</label>
+                <select id="tipeKameraProduk" class="w-full border p-2 rounded mt-1 mb-2">
+                    <option value="environment">Kamera Belakang</option>
+                    <option value="user">Kamera Depan</option>
+                </select>
+                <button onclick="mulaiScan('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm"><i class="fa fa-qrcode"></i> Scan Barcode</button>
+                <div id="areaKameraProduk" class="hidden mt-2 relative bg-black rounded-lg overflow-hidden">
+                    <video id="videoProduk" class="w-full h-32 object-cover"></video>
+                    <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">✕</button>
+                </div>
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="text-sm font-medium">Kode Produk / Barcode</label>
+                    <input type="text" id="kodeProduk" class="w-full border p-2 rounded font-mono font-bold" placeholder="Otomatis A1,A2... atau hasil scan">
+                    <p class="text-xs text-gray-500 mt-1">* Kosongkan jika ingin kode otomatis A1, A2...</p>
+                </div>
+                <div>
+                    <label class="text-sm font-medium">Nama Produk</label>
+                    <input type="text" id="namaProduk" class="w-full border p-2 rounded" placeholder="Misal: Air Mineral" required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm font-medium">Harga Beli (Modal)</label>
+                        <input type="number" id="hargaBeli" class="w-full border p-2 rounded" placeholder="0">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium">Harga Jual</label>
+                        <input type="number" id="hargaJual" class="w-full border p-2 rounded" placeholder="0" required>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm font-medium">Stok Awal</label>
+                        <input type="number" id="stokProduk" class="w-full border p-2 rounded" value="0" min="0">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium">Kategori</label>
+                        <select id="kategoriProduk" class="w-full border p-2 rounded">
+                            <option>Makanan</option>
+                            <option>Minuman</option>
+                            <option>Snack</option>
+                            <option>Lainnya</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="simpanProdukBaru()" class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">
+                    <i class="fa fa-save"></i> Simpan Ke Database
+                </button>
+            </div>
+        </div>
+
+        <!-- CARI & DAFTAR PRODUK -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-bold text-lg mb-3">📋 Daftar & Cari Produk</h3>
+            <input type="text" id="kataCariProduk" class="w-full border p-2 rounded mb-3" placeholder="Cari nama atau kode..." oninput="tampilkanDaftarProduk()">
+            <div id="daftarProduk" class="space-y-2 text-sm max-h-80 overflow-y-auto">
+                <p class="text-gray-500 text-center py-4">Memuat data...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- =============== HALAMAN LAPORAN =============== -->
+    <div id="laporan" class="tab-content p-4">
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <h3 class="font-bold text-lg mb-2">📊 Ringkasan Hari Ini</h3>
+            <p>Total Transaksi: <span id="jmlTransaksiHari">0</span></p>
+            <p>Total Pendapatan: <span id="pendapatanHari">Rp 0</span></p>
+        </div>
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-bold text-lg mb-3">Riwayat Transaksi</h3>
+            <div id="riwayatTransaksi" class="text-sm space-y-2 max-h-96 overflow-y-auto">
+                <p class="text-gray-500 text-center py-2">Belum ada riwayat</p>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// -------------------- FUNGSI KEAMANAN PIN --------------------
+function cekPin() {
+    const pinMasukan = document.getElementById('inputPin').value;
+    if(pinMasukan === PIN_AKSES) {
+        document.getElementById('layarLogin').classList.add('hidden');
+        document.getElementById('appUtama').classList.remove('hidden');
+        tampilkanDaftarProduk();
+        tampilkanLaporan();
+    } else {
+        alert("PIN Salah! Coba lagi.");
+        document.getElementById('inputPin').value = "";
+    }
+}
+function keluarAplikasi() {
+    location.reload();
+}
+
+// -------------------- FUNGSI NAVIGASI TAB --------------------
+function bukaTab(namaTab, elemen) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-blue-600', 'border-blue-600');
+        btn.classList.add('text-gray-500', 'border-transparent');
+    });
+    document.getElementById(namaTab).classList.add('active');
+    elemen.classList.remove('text-gray-500', 'border-transparent');
+    elemen.classList.add('text-blue-600', 'border-blue-600');
+}
+
+// -------------------- FUNGSI LOCAL STORAGE --------------------
+function ambilData(key) {
+    return JSON.parse(localStorage.getItem(key)) || [];
+}
+function simpanData(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+}
+
+// -------------------- LOGIKA KAMERA & SCAN (DIPERBAIKI) --------------------
+function mulaiScan(dariHalaman) {
+    hentikanScan(); // Hentikan dulu jika ada kamera nyala lain
+    
+    let tipeKamera, videoElem, areaKamera;
+    
+    if(dariHalaman === 'transaksi') {
+        tipeKamera = document.getElementById('tipeKameraTransaksi').value;
+        videoElem = document.getElementById('videoTransaksi');
+        areaKamera = document.getElementById('areaKameraTransaksi');
+    } else {
+        tipeKamera = document.getElementById('tipeKameraProduk').value;
+        videoElem = document.getElementById('videoProduk');
+        areaKamera = document.getElementById('areaKameraProduk');
+    }
+
+    areaKamera.classList.remove('hidden');
+
+    // Perbaikan akses kamera: Gunakan metode yang lebih kompatibel
+    codeReader = new ZXing.BrowserBarcodeReader();
+    codeReader.decodeFromVideoDevice(null, videoElem, (result, err) => {
+        if (result) {
+            const kodeHasil = result.text;
+            alert("✅ Terbaca: " + kodeHasil);
+            
+            if(dariHalaman === 'transaksi') {
+                tambahKeKeranjang(kodeHasil);
+            } else {
+                document.getElementById('kodeProduk').value = kodeHasil;
+            }
+            hentikanScan();
+        }
+    }, { 
+        facingMode: tipeKamera, 
+        videoConstraints: { 
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+        } 
+    });
+}
+
+function hentikanScan() {
+    if (codeReader) {
+        codeReader.reset();
+        codeReader = null;
+    }
+    // Sembunyikan semua area kamera
+    document.querySelectorAll('[id^="areaKamera"]').forEach(el => el.classList.add('hidden'));
+}
+
+// -------------------- LOGIKA PRODUK --------------------
+function dapatkanKodeTerbaru() {
+    const produk = ambilData('produk');
+    return "A" + (produk.length + 1);
+}
+
+function simpanProdukBaru() {
+    let kode = document.getElementById('kodeProduk').value.trim();
+    
+    // Jika kode kosong, ambil otomatis A1, A2...
+    if(!kode) {
+        kode = dapatkanKodeTerbaru();
+    }
+    
+    const data = {
+        kode: kode,
+        nama: document.getElementById('namaProduk').value,
+        beli: parseInt(document.getElementById('hargaBeli').value) || 0,
+        jual: parseInt(document.getElementById('hargaJual').value) || 0,
+        stok: parseInt(document.getElementById('stokProduk').value) || 0,
+        kategori: document.getElementById('kategoriProduk').value,
+        waktu: new Date().toLocaleString('id-ID')
+    };
+
+    // Simpan ke LocalStorage
+    const daftarProduk = ambilData('produk');
+    daftarProduk.push(data);
+    simpanData('produk', daftarProduk);
+
+    alert("✅ Produk Berhasil Disimpan!");
+    // Reset form
+    document.getElementById('kodeProduk').value = "";
+    document.getElementById('namaProduk').value = "";
+    document.getElementById('hargaBeli').value = "";
+    document.getElementById('hargaJual').value = "";
+    document.getElementById('stokProduk').value = "";
+    tampilkanDaftarProduk();
+}
+
+function cariProduk(keyword) {
+    const daftarProduk = ambilData('produk');
+    keyword = keyword.toLowerCase();
+    return daftarProduk.filter(item => 
+        item.kode.toLowerCase().includes(keyword) || 
+        item.nama.toLowerCase().includes(keyword)
+    );
+}
+
+function tampilkanDaftarProduk() {
+    const kata = document.getElementById('kataCariProduk')?.value || "";
+    const hasil = cariProduk(kata);
+    
+    const el = document.getElementById('daftarProduk');
+    if(hasil.length === 0) return el.innerHTML = "<p class='text-gray-500 text-center'>Tidak ada data</p>";
+    
+    el.innerHTML = "";
+    hasil.forEach(item => {
+        el.innerHTML += `
+        <div class="border-b py-2 px-1 hover:bg-blue-50 rounded">
+            <div class="flex justify-between items-start">
+                <span class="font-mono bg-blue-100 px-2 rounded font-bold">${item.kode}</span>
+                <span class="font-semibold">Stok: ${item.stok}</span>
+            </div>
+            <div>${item.nama}</div>
+            <div class="text-xs text-gray-600">Harga: Rp ${item.jual.toLocaleString('id-ID')}</div>
+        </div>`;
+    });
+}
+
+// -------------------- LOGIKA TRANSAKSI --------------------
+function cariDanTampilkanProduk() {
+    const kata = document.getElementById('kataCariTransaksi').value;
+    const hasil = cariProduk(kata);
+    
+    const el = document.getElementById('hasilCariTransaksi');
+    el.innerHTML = "";
+    hasil.forEach(item => {
+        el.innerHTML += `
+        <div class="border-b py-1 flex justify-between items-center">
+            <span>${item.kode} - ${item.nama}</span>
+            <button onclick="tambahKeKeranjang('${item.kode}')" class="text-blue-600 font-bold">+ Tambah</button>
+        </div>`;
+    });
+}
+
+function tambahKeKeranjang(kode) {
+    const hasil = cariProduk(kode);
+    if(hasil.length === 0) return alert("Produk tidak ada di database!");
+    const p = hasil[0];
+    keranjang.push({ kode:p.kode, nama:p.nama, harga:p.jual, qty:1 });
+    updateTampilanKeranjang();
+}
+
+function updateTampilanKeranjang() {
+    const el = document.getElementById('daftarKeranjang');
+    if(keranjang.length === 0) {
+        el.innerHTML = "<p class='text-gray-500 text-center py-2'>Belum ada barang</p>";
+    } else {
+        el.innerHTML = "";
+        totalBayar = 0;
+        keranjang.forEach((item, idx) => {
+            const subtotal = item.harga * item.qty;
+            totalBayar += subtotal;
+            el.innerHTML += `
+            <div class="flex justify-between items-center">
+                <span>${item.nama}</span>
+                <div>
+                    <button onclick="ubahQty(${idx}, -1)" class="px-1 bg-gray-200 rounded">-</button>
+                    <span>${item.qty}</span>
+                    <button onclick="ubahQty(${idx}, 1)" class="px-1 bg-gray-200 rounded">+</button>
+                    <span class="ml-2">Rp ${subtotal.toLocaleString('id-ID')}</span>
+                    <button onclick="hapusItem(${idx})" class="text-red-500 ml-2 text-xs">✕</button>
+                </div>
+            </div>`;
+        });
+    }
+    document.getElementById('labelTotal').innerText = "Rp " + totalBayar.toLocaleString('id-ID');
+    hitungKembalian();
+}
+
+function ubahQty(index, nilai) {
+    keranjang[index].qty += nilai;
+    if(keranjang[index].qty < 1) keranjang[index].qty = 1;
+    updateTampilanKeranjang();
+}
+
+function hapusItem(index) {
+    keranjang.splice(index, 1);
+    updateTampilanKeranjang();
+}
+
+function hitungKembalian() {
+    const bayar = parseInt(document.getElementById('uangBayar').value) || 0;
+    const kembali = bayar - totalBayar;
+    document.getElementById('labelKembalian').innerText = "Rp " + kembali.toLocaleString('id-ID');
+}
+
+function prosesTransaksi() {
+    if(keranjang.length === 0) return alert("Keranjang masih kosong!");
+    const bayar = parseInt(document.getElementById('uangBayar').value) || 0;
+    if(bayar < totalBayar) return alert("Uang kurang!");
+
+    const dataTransaksi = {
+        tanggal: new Date().toLocaleString('id-ID'),
+        items: keranjang,
+        total: totalBayar,
+        bayar: bayar,
+        kembali: bayar - totalBayar
+    };
+
+    // Simpan ke LocalStorage
+    const daftarTransaksi = ambilData('transaksi');
+    daftarTransaksi.push(dataTransaksi);
+    simpanData('transaksi', daftarTransaksi);
+
+    alert("✅ Transaksi Berhasil Disimpan!");
+    keranjang = [];
+    totalBayar = 0;
+    document.getElementById('uangBayar').value = "";
+    updateTampilanKeranjang();
+    tampilkanLaporan();
+}
+
+// -------------------- LOGIKA LAPORAN --------------------
+function tampilkanLaporan() {
+    const daftarTransaksi = ambilData('transaksi');
+    let totalHari = 0;
+    let jmlTrx = daftarTransaksi.length;
+    const hariIni = new Date().toLocaleDateString('id-ID');
+
+    const elRiwayat = document.getElementById('riwayatTransaksi');
+    elRiwayat.innerHTML = "";
+
+    daftarTransaksi.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(trx => {
+        const tglTrx = new Date(trx.tanggal).toLocaleDateString('id-ID');
+        if(tglTrx === hariIni) totalHari += trx.total;
+
+        elRiwayat.innerHTML += `
+        <div class="border-b py-2">
+            <div class="font-semibold">${trx.tanggal}</div>
+            <div>Total: Rp ${trx.total.toLocaleString('id-ID')}</div>
+        </div>`;
+    });
+
+    document.getElementById('jmlTransaksiHari').innerText = jmlTrx;
+    document.getElementById('pendapatanHari').innerText = "Rp " + totalHari.toLocaleString('id-ID');
+}
+</script>
+</body>
+</html>
