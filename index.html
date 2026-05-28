@@ -2,788 +2,456 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>LAPORAN PEMBAYARAN WIFI</title>
-    <!-- Tambahkan pustaka ZXing agar kamera berfungsi -->
-    <script src="https://unpkg.com/@zxing/library@0.19.1/dist/index.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kasir Pintar - LocalStorage</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <!-- 🔽 ALAMAT DIPERBAIKI: Pasti benar dan dimuat duluan -->
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/zxing.min.js"></script>
+    <script>
+        const PIN_AKSES = "999";
+        let codeReader;
+        let keranjang = [];
+        let totalBayar = 0;
+    </script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            font-weight: bold;
-            white-space: nowrap;
-            text-transform: uppercase;
-        }
-
-        body {
-            background-color: #ffffff;
-            padding: 2px;
-            overflow-x: hidden;
-        }
-
-        .container {
-            max-width: 1080px;
-            margin: 0 auto;
-        }
-
-        /* HEADER UTAMA - SANGAT PADAT */
-        .header-bar {
-            background: linear-gradient(90deg, #3B82F6 0%, #9333EA 100%);
-            color: white;
-            text-align: center;
-            padding: 5px 0;
-            border-radius: 8px;
-            font-weight: 900;
-            font-size: clamp(12px, 2.8vw, 18px);
-            letter-spacing: 0.3px;
-            margin-bottom: 3px;
-        }
-
-        /* KOTAK SALDO UTAMA */
-        .saldo-card {
-            background: linear-gradient(90deg, #3b82f6 0%, #a855f7 100%);
-            border-radius: 8px;
-            padding: 6px 6px;
-            text-align: center;
-            color: white;
-            margin-bottom: 3px;
-        }
-
-        .system-online {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 3px;
-            font-size: clamp(9px, 2.2vw, 12px);
-            margin-bottom: 1px;
-            position: relative;
-            width: 100%;
-        }
-
-        .system-online span {
-            color: #39FF14;
-            text-shadow: 0 0 4px rgba(57, 255, 20, 0.8);
-            line-height: 1;
-            display: flex;
-            align-items: center;
-            height: 14px;
-        }
-
-        .radar-wrapper {
-            position: relative;
-            width: 14px;
-            height: 14px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            flex-shrink: 0;
-        }
-
-        .radar-dot {
-            width: 3px;
-            height: 3px;
-            background-color: #00FF00;
-            border-radius: 50%;
-            position: relative;
-            z-index: 2;
-            box-shadow: 0 0 3px #00FF00;
-        }
-
-        .radar-wave {
-            position: absolute;
-            border: 1px solid rgba(0, 255, 0, 0.8);
-            border-radius: 50%;
-            animation: radarKedip 2s infinite ease-out;
-            z-index: 1;
-        }
-
-        .radar-wave:nth-child(2) { animation-delay: 0s; }
-        .radar-wave:nth-child(3) { animation-delay: 0.6s; }
-        .radar-wave:nth-child(4) { animation-delay: 1.2s; }
-
-        @keyframes radarKedip {
-            0% { width: 0px; height: 0px; opacity: 1; border-width: 1px; box-shadow: 0 0 4px rgba(255,255,255,0.6); }
-            100% { width: 18px; height: 18px; opacity: 0; border-width: 1px; box-shadow: 0 0 1px rgba(255,255,255,0.2); }
-        }
-
-        .saldo-label {
-            font-size: clamp(8px, 2vw, 11px);
-            opacity: 0.9;
-            margin-bottom: 1px;
-        }
-
-        .saldo-value {
-            font-size: clamp(20px, 6vw, 32px);
-            font-weight: 900;
-            color: #ffffff;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.15), 
-                         0 1px 1px rgba(0, 0, 0, 0.08);
-            transform: translateY(-1px);
-            position: relative;
-            z-index: 2;
-            text-transform: none;
-        }
-
-        /* TOTAL BAYAR & TOTAL TAGIHAN */
-        .total-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 3px;
-            margin-bottom: 3px;
-        }
-
-        .total-box {
-            background-color: #ffffff;
-            border-radius: 8px;
-            padding: 5px 3px 2px 3px;
-            text-align: center;
-            box-shadow: 0 1px 1px rgba(0,0,0,0.1);
-            position: relative;
-            overflow: hidden;
-        }
-
-        .total-label {
-            font-size: clamp(7px, 1.8vw, 10px);
-            color: #6b7280;
-            margin-bottom: 1px;
-        }
-
-        .total-bayar {
-            font-size: clamp(14px, 4.5vw, 22px);
-            font-weight: 800;
-            color: #16a34a;
-            padding-bottom: 1px;
-            border-bottom: 1px solid #16a34a;
-            border-radius: 0 0 4px 4px;
-            box-shadow: 0 1px 0 0 #ffffff;
-            text-transform: none;
-        }
-
-        .total-tagihan {
-            font-size: clamp(14px, 4.5vw, 22px);
-            font-weight: 800;
-            color: #dc2626;
-            padding-bottom: 1px;
-            border-bottom: 1px solid #dc2626;
-            border-radius: 0 0 4px 4px;
-            box-shadow: 0 1px 0 0 #ffffff;
-            text-transform: none;
-        }
-
-        /* TOMBOL INPUT & KAMERA */
-        .input-bar, .kamera-bar {
-            background: linear-gradient(90deg, #3B82F6 0%, #9333EA 100%);
-            color: white;
-            text-align: center;
-            padding: 5px 0;
-            border-radius: 8px;
-            font-size: clamp(10px, 2.5vw, 13px);
-            margin-bottom: 3px;
-            cursor: pointer;
-            transition: opacity 0.2s;
-            border: 1px solid transparent;
-        }
-        .kamera-bar { background: linear-gradient(90deg, #10B981 0%, #059669 100%); }
-        .input-bar:hover, .kamera-bar:hover { opacity: 0.9; }
-
-        /* TABEL - SPASI VERTIKAL PALING RAPAT */
-        .table-container {
-            width: 100%;
-            margin-bottom: 2px;
-            background-color: transparent;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-            gap: 0px;
-        }
-
-        .table-header, .table-row, .table-total {
-            display: grid;
-            grid-template-columns: 1.8fr 1.1fr 1.1fr 1.1fr 0.6fr 1.2fr;
-            width: 100%;
-            border: none;
-            min-height: 22px;
-        }
-
-        .table-header {
-            background-color: #EFF6FF;
-            padding: 2px 0;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            margin-bottom: 1px;
-        }
-
-        .table-row {
-            background-color: #ffffff;
-            padding: 1px 0;
-            margin-bottom: 1px;
-        }
-
-        .table-cell {
-            border: none;
-            text-align: center;
-            padding: 1px 1px;
-            font-size: clamp(8px, 2.2vw, 11px);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            line-height: 1;
-        }
-
-        .nama-bulan {
-            color: #2563EB;
-            justify-content: flex-start;
-            padding-left: 4px;
-            font-size: clamp(9px, 2.4vw, 12px);
-            padding-top: 0px;
-            padding-bottom: 0px;
-        }
-
-        .nilai-bayar { color: #16A34A; text-transform: none; }
-        .nilai-tagih { color: #DC2626; text-transform: none; }
-        .nilai-saldo { color: #16A34A; text-transform: none; }
-        .nilai-akm { color: #2563EB; text-transform: none; }
-
-        .table-total {
-            background: linear-gradient(90deg, #3B82F6 0%, #9333EA 100%);
-            color: white;
-            padding: 2px 0;
-            font-weight: 900;
-            border: 1px solid #6366F1 !important;
-            border-radius: 6px;
-            margin-bottom: 1px;
-        }
-
-        .table-total .table-cell {
-            font-size: clamp(9px, 2.4vw, 12px) !important;
-            font-weight: 900 !important;
-        }
-
-        .icon-hapus {
-            font-size: 10px !important;
-            cursor: pointer;
-            color: #94A3B8 !important;
-            transition: 0.2s;
-            font-weight: normal;
-        }
-        .icon-hapus:hover { color: #EF4444 !important; transform: scale(1.1); }
-
-        /* MODAL PIN - KEMBALI KE BENTUK AWAL */
-        .modal-pin {
-            display: none;
-            position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            z-index: 999;
-            align-items: center;
-            justify-content: center;
-            padding: 8px;
-            overflow-y: auto;
-        }
-
-        .modal-content {
-            background-color: #ffffff;
-            border-radius: 12px;
-            padding: 12px 10px;
-            width: 100%; max-width: 280px;
-            text-align: center;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        }
-
-        .modal-content h3 {
-            margin-bottom: 8px;
-            color: #334155;
-            font-size: clamp(13px, 3vw, 16px);
-        }
-
-        .pin-display {
-            font-size: clamp(16px, 5vw, 20px);
-            letter-spacing: 6px;
-            padding: 6px 4px;
-            border: 1px solid #cbd5e1;
-            border-radius: 8px;
-            margin-bottom: 10px;
-            background-color: #f1f5f9;
-            color: #1e293b;
-            min-height: 36px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .keypad {
-            display: grid;
-            grid-template-columns: 33% 33% 33%;
-            gap: 4px;
-        }
-
-        .key {
-            padding: 8px 4px;
-            font-size: clamp(13px, 3.5vw, 16px);
-            border: none;
-            border-radius: 6px;
-            background-color: #e2e8f0;
-            color: #1e293b;
-            cursor: pointer;
-            transition: 0.2s;
-        }
-        .key:hover { background-color: #cbd5e1; }
-
-        .key-action {
-            background: linear-gradient(90deg, #2563eb 0%, #9333ea 100%);
-            color: white;
-        }
-        .key-action:hover { opacity: 0.9; }
-
-        /* MODAL SIMPAN */
-        .modal-simpan {
-            display: none;
-            position: fixed;top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-            padding: 8px;
-            overflow-y: auto;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 3px;
-            margin-bottom: 8px;
-            text-align: left;
-        }
-        .form-group label {
-            font-size: clamp(10px, 2.5vw, 13px);
-            color: #334155;
-        }
-        .form-group input {
-            padding: 6px 8px;
-            border: 1px solid #cbd5e1;
-            border-radius: 6px;
-            font-size: clamp(10px, 2.5vw, 13px);
-            outline: none;
-            font-weight: bold;
-            width: 100%;
-            text-transform: none;
-        }
-
-        .btn-simpan-data {
-            background: linear-gradient(90deg, #2563eb 0%, #9333ea 100%);
-            color: white;
-            border: none;
-            padding: 8px 0;
-            border-radius: 6px;
-            font-size: clamp(11px, 2.8vw, 14px);
-            cursor: pointer;
-            width: 100%;
-        }
-        .btn-simpan-data:hover { opacity: 0.9; }
-
-        /* MODAL KAMERA */
-        .modal-kamera {
-            display: none;
-            position: fixed;top: 0; left: 0;
-            width: 100%; height: 100%;
-            background-color: rgba(0,0,0,0.85);
-            z-index: 1001;
-            align-items: center;
-            justify-content: center;
-            padding: 8px;
-            overflow-y: auto;
-        }
-        .kamera-kotak {
-            background: #fff;
-            border-radius: 10px;
-            width: 100%; max-width: 320px;
-            text-align: center;
-            padding: 10px;
-        }
-        #videoKamera { width: 100%; border-radius: 8px; background: #000; margin-bottom: 8px; }
-        .btn-ambil, .btn-tutup {
-            padding: 7px 12px;
-            border: none; border-radius: 6px;
-            font-weight: bold; font-size: 14px;
-            margin: 0 4px; cursor: pointer;
-        }
-        .btn-ambil { background: #10B981; color: white; }
-        .btn-tutup { background: #EF4444; color: white; }
-
-        .footer-text {
-            text-align: center;
-            font-size: clamp(8px, 1.8vw, 11px);
-            color: #94a3b8;
-            margin-top: 4px;
-            letter-spacing: 0.3px;
-        }
+        body { max-width: 480px; margin: auto; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; min-height: 200px; }
     </style>
 </head>
-<body>
-    <div class="container">
-        <div class="header-bar">
-            LAPORAN PEMBAYARAN WIFI
+<body class="bg-gray-100">
+
+<!-- LAYAR LOGIN PIN -->
+<div id="layarLogin" class="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-xl p-6 w-full max-w-xs text-center shadow-lg">
+        <i class="fa fa-lock text-blue-600 text-4xl mb-3"></i>
+        <h2 class="text-xl font-bold mb-4">Masukkan PIN Akses</h2>
+        <input type="password" id="inputPin" maxlength="3" class="w-full border-2 border-blue-500 rounded-lg text-center text-2xl font-bold py-2 mb-4" placeholder="***">
+        <button onclick="cekPin()" class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">Buka Aplikasi</button>
+        <p class="text-xs text-gray-500 mt-2">PIN Bawaan: 999</p>
+    </div>
+</div>
+
+<!-- KONTEN UTAMA -->
+<div id="appUtama" class="hidden">
+    <header class="bg-blue-600 text-white p-4 shadow flex justify-between items-center">
+        <h1 class="text-xl font-bold">🏪 KASIR PINTAR</h1>
+        <button onclick="keluarAplikasi()" class="text-sm bg-white/20 px-2 py-1 rounded"><i class="fa fa-sign-out"></i></button>
+    </header>
+
+    <!-- PESAN PENTING -->
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 text-sm text-center font-bold">
+        ⚠️ PENTING: Saat tombol diklik, <u>WAJIB PILIH IZINKAN</u> di notifikasi Chrome agar kamera jalan!
+    </div>
+
+    <!-- MENU TAB NAVIGASI -->
+    <div class="bg-white flex border-b sticky top-0 z-10 shadow-sm">
+        <button class="tab-btn flex-1 py-3 text-center font-semibold text-blue-600 border-b-2 border-blue-600" onclick="bukaTab('transaksi', this)">
+            <i class="fa fa-shopping-cart"></i> Transaksi
+        </button>
+        <button class="tab-btn flex-1 py-3 text-center font-semibold text-gray-500" onclick="bukaTab('produk', this)">
+            <i class="fa fa-box"></i> Produk
+        </button>
+        <button class="tab-btn flex-1 py-3 text-center font-semibold text-gray-500" onclick="bukaTab('laporan', this)">
+            <i class="fa fa-file-text"></i> Laporan
+        </button>
+    </div>
+
+    <!-- =============== HALAMAN TRANSAKSI =============== -->
+    <div id="transaksi" class="tab-content active p-4">
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <button onclick="mulaiScanBaru('transaksi')" class="w-full bg-blue-500 text-white py-3 rounded font-bold text-lg">
+                <i class="fa fa-qrcode"></i> MULAI SCAN BARCODE
+            </button>
+            <div id="areaKameraTransaksi" class="video-container hidden">
+                <video id="videoTransaksi" class="w-full h-full object-cover" autoplay playsinline></video>
+                <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕ TUTUP</button>
+                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Arahkan ke kode</p>
+            </div>
         </div>
 
-        <div class="saldo-card">
-            <div class="system-online">
-                <div class="radar-wrapper">
-                    <div class="radar-wave"></div>
-                    <div class="radar-wave"></div>
-                    <div class="radar-wave"></div>
-                    <div class="radar-dot"></div>
+        <!-- CARI PRODUK -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <label class="font-semibold text-sm">Cari Produk (Nama / Kode):</label>
+            <div class="flex gap-2 mt-1">
+                <input type="text" id="kataCariTransaksi" class="flex-1 border p-2 rounded" placeholder="Contoh: A1 / Sabun...">
+                <button onclick="cariDanTampilkanProduk()" class="bg-green-500 text-white px-3 rounded">Cari</button>
+            </div>
+            <div id="hasilCariTransaksi" class="mt-2 max-h-32 overflow-y-auto text-sm"></div>
+        </div>
+
+        <!-- KERANJANG BELANJA -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <h3 class="font-bold text-lg mb-2">🛒 Keranjang</h3>
+            <div id="daftarKeranjang" class="space-y-1 text-sm mb-3 border-b pb-2">
+                <p class="text-gray-500 text-center py-2">Belum ada barang</p>
+            </div>
+            <div class="flex justify-between font-bold text-lg">
+                <span>TOTAL:</span>
+                <span id="labelTotal">Rp 0</span>
+            </div>
+        </div>
+
+        <!-- PEMBAYARAN -->
+        <div class="bg-white rounded-lg shadow p-3 mb-4">
+            <label class="font-semibold">Uang Diterima:</label>
+            <input type="number" id="uangBayar" class="w-full border p-2 rounded mt-1" placeholder="0" oninput="hitungKembalian()">
+            <div class="flex justify-between font-semibold text-lg mt-2">
+                <span>Kembalian:</span>
+                <span id="labelKembalian" class="text-green-600">Rp 0</span>
+            </div>
+            <button onclick="prosesTransaksi()" class="w-full bg-green-600 text-white py-3 rounded-lg mt-3 font-bold text-lg">
+                ✔ Simpan Transaksi
+            </button>
+        </div>
+    </div>
+
+    <!-- =============== HALAMAN INPUT PRODUK =============== -->
+    <div id="produk" class="tab-content p-4">
+        <div class="bg-white rounded-lg shadow p-4 mb-6">
+            <h3 class="font-bold text-lg mb-3">➕ Tambah Produk Baru</h3>
+            
+            <div class="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-200">
+                <button onclick="mulaiScanBaru('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm font-bold">
+                    <i class="fa fa-qrcode"></i> SCAN BARCODE UNTUK KODE
+                </button>
+                <div id="areaKameraProduk" class="video-container hidden">
+                    <video id="videoProduk" class="w-full h-full object-cover" autoplay playsinline></video>
+                    <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕ TUTUP</button>
                 </div>
-                <span>SYSTEM ONLINE</span>
             </div>
-            <div class="saldo-label">SALDO AKUMULASI SAAT INI</div>
-            <div class="saldo-value" id="saldoAkumulasi">Rp 0</div>
-        </div>
 
-        <div class="total-row">
-            <div class="total-box">
-                <div class="total-label">TOTAL BAYAR</div>
-                <div class="total-bayar" id="totalBayar">Rp 0</div>
+            <div class="space-y-3">
+                <div>
+                    <label class="text-sm font-medium">Kode Produk / Barcode</label>
+                    <input type="text" id="kodeProduk" class="w-full border p-2 rounded font-mono font-bold" placeholder="Otomatis A1,A2... atau hasil scan">
+                    <p class="text-xs text-gray-500 mt-1">* Kosongkan jika ingin kode otomatis A1, A2...</p>
+                </div>
+                <div>
+                    <label class="text-sm font-medium">Nama Produk</label>
+                    <input type="text" id="namaProduk" class="w-full border p-2 rounded" placeholder="Misal: Air Mineral" required>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm font-medium">Harga Beli (Modal)</label>
+                        <input type="number" id="hargaBeli" class="w-full border p-2 rounded" placeholder="0">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium">Harga Jual</label>
+                        <input type="number" id="hargaJual" class="w-full border p-2 rounded" placeholder="0" required>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="text-sm font-medium">Stok Awal</label>
+                        <input type="number" id="stokProduk" class="w-full border p-2 rounded" value="0" min="0">
+                    </div>
+                    <div>
+                        <label class="text-sm font-medium">Kategori</label>
+                        <select id="kategoriProduk" class="w-full border p-2 rounded">
+                            <option>Makanan</option>
+                            <option>Minuman</option>
+                            <option>Snack</option>
+                            <option>Lainnya</option>
+                        </select>
+                    </div>
+                </div>
+                <button onclick="simpanProdukBaru()" class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">
+                    <i class="fa fa-save"></i> Simpan Ke Database
+                </button>
             </div>
-            <div class="total-box">
-                <div class="total-label">TOTAL TAGIHAN</div>
-                <div class="total-tagihan" id="totalTagihan">Rp 0</div>
-            </div>
         </div>
 
-        <!-- TOMBOL INPUT & KAMERA -->
-        <div class="input-bar" id="btnBukaPin">
-            INPUT DATA BARU
-        </div>
-        <div class="kamera-bar" id="btnBukaKamera">
-            BUKA KAMERA 📸
-        </div>
-
-        <div class="table-container">
-            <div class="table-header">
-                <div class="table-cell">BULAN</div>
-                <div class="table-cell">PEMBAYARAN</div>
-                <div class="table-cell">TAGIHAN</div>
-                <div class="table-cell">SALDO</div>
-                <div class="table-cell">OPSI</div>
-                <div class="table-cell">AKM. SALDO</div>
-            </div>
-            <div id="isiTabel"></div>
-        </div>
-
-        <div class="footer-text">
-            POWERED BY: MBS ID
-        </div>
-    </div>
-
-
-    <!-- MODAL PIN -->
-    <div class="modal-pin" id="modalPin">
-        <div class="modal-content">
-            <h3>MASUKKAN PIN</h3>
-            <div class="pin-display" id="pinDisplay">******</div>
-            <div class="keypad">
-                <button class="key" onclick="tekanAngka(1)">1</button>
-                <button class="key" onclick="tekanAngka(2)">2</button>
-                <button class="key" onclick="tekanAngka(3)">3</button>
-                <button class="key" onclick="tekanAngka(4)">4</button>
-                <button class="key" onclick="tekanAngka(5)">5</button>
-                <button class="key" onclick="tekanAngka(6)">6</button>
-                <button class="key" onclick="tekanAngka(7)">7</button>
-                <button class="key" onclick="tekanAngka(8)">8</button>
-                <button class="key" onclick="tekanAngka(9)">9</button>
-                <button class="key key-action" onclick="hapusAngka()">C</button>
-                <button class="key" onclick="tekanAngka(0)">0</button>
-                <button class="key key-action" onclick="cekPin()">OK</button>
+        <!-- CARI & DAFTAR PRODUK -->
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-bold text-lg mb-3">📋 Daftar & Cari Produk</h3>
+            <input type="text" id="kataCariProduk" class="w-full border p-2 rounded mb-3" placeholder="Cari nama atau kode..." oninput="tampilkanDaftarProduk()">
+            <div id="daftarProduk" class="space-y-2 text-sm max-h-80 overflow-y-auto">
+                <p class="text-gray-500 text-center py-4">Memuat data...</p>
             </div>
         </div>
     </div>
 
-
-    <!-- MODAL SIMPAN -->
-    <div class="modal-simpan" id="modalSimpan">
-        <div class="modal-content">
-            <h3>SIMPAN DATA</h3>
-            <div class="form-group">
-                <label for="bulanTahun">BULAN & TAHUN</label>
-                <input type="month" id="bulanTahun" name="bulanTahun" min="2000-01" max="3000-12">
-            </div>
-            <div class="form-group">
-                <label for="pembayaran">PEMBAYARAN (Rp)</label>
-                <input type="number" id="pembayaran" name="pembayaran" value="55000">
-            </div>
-            <div class="form-group">
-                <label for="tagihan">TAGIHAN (Rp)</label>
-                <input type="number" id="tagihan" name="tagihan" value="52447">
-            </div>
-            <button class="btn-simpan-data" onclick="simpanData()">SIMPAN</button>
+    <!-- =============== HALAMAN LAPORAN =============== -->
+    <div id="laporan" class="tab-content p-4">
+        <div class="bg-white rounded-lg shadow p-4 mb-4">
+            <h3 class="font-bold text-lg mb-2">📊 Ringkasan Hari Ini</h3>
+            <p>Total Transaksi: <span id="jmlTransaksiHari">0</span></p>
+            <p>Total Pendapatan: <span id="pendapatanHari">Rp 0</span></p>
         </div>
-    </div>
-
-
-    <!-- MODAL KAMERA -->
-    <div class="modal-kamera" id="modalKamera">
-        <div class="kamera-kotak">
-            <h3>SCAN KODE / KAMERA</h3>
-            <video id="videoKamera" autoplay playsinline></video>
-            <div>
-                <button class="btn-ambil" onclick="ambilFoto()">SCAN</button>
-                <button class="btn-tutup" onclick="tutupKamera()">TUTUP</button>
+        <div class="bg-white rounded-lg shadow p-4">
+            <h3 class="font-bold text-lg mb-3">Riwayat Transaksi</h3>
+            <div id="riwayatTransaksi" class="text-sm space-y-2 max-h-96 overflow-y-auto">
+                <p class="text-gray-500 text-center py-2">Belum ada riwayat</p>
             </div>
         </div>
     </div>
 
+</div>
 
-    <script>
-        const modalPin = document.getElementById('modalPin');
-        const modalSimpan = document.getElementById('modalSimpan');
-        const modalKamera = document.getElementById('modalKamera');
-        const pinDisplay = document.getElementById('pinDisplay');
-        const videoKamera = document.getElementById('videoKamera');
-        let streamKamera = null;
-        let codeReader = null;
-        let inputPin = '';
-        let barisAkanDihapus = null;
-        
-        let totalBayar = 0;
-        let totalTagihan = 0;
-        let saldoAkumulasi = 0;
-        let dataPerBulan = {};
+<script>
+// -------------------- FUNGSI KEAMANAN PIN --------------------
+function cekPin() {
+    const pinMasukan = document.getElementById('inputPin').value;
+    if(pinMasukan === PIN_AKSES) {
+        document.getElementById('layarLogin').classList.add('hidden');
+        document.getElementById('appUtama').classList.remove('hidden');
+        tampilkanDaftarProduk();
+        tampilkanLaporan();
+    } else {
+        alert("PIN Salah! Coba lagi.");
+        document.getElementById('inputPin').value = "";
+    }
+}
+function keluarAplikasi() {
+    location.reload();
+}
 
-        function setTanggalHariIni() {
-            const sekarang = new Date();
-            const tahun = sekarang.getFullYear();
-            const bulan = String(sekarang.getMonth() + 1).padStart(2, '0');
-            document.getElementById('bulanTahun').value = `${tahun}-${bulan}`;
-        }
+// -------------------- FUNGSI NAVIGASI TAB --------------------
+function bukaTab(namaTab, elemen) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('text-blue-600', 'border-blue-600');
+        btn.classList.add('text-gray-500', 'border-transparent');
+    });
+    document.getElementById(namaTab).classList.add('active');
+    elemen.classList.remove('text-gray-500', 'border-transparent');
+    elemen.classList.add('text-blue-600', 'border-blue-600');
+}
 
-        document.getElementById('btnBukaPin').addEventListener('click', function() {
-            modalPin.style.display = 'flex';
-            modalSimpan.style.display = 'none';
-            inputPin = '';
-            pinDisplay.textContent = '******';
-            barisAkanDihapus = null;
-        });
+// -------------------- FUNGSI LOCAL STORAGE --------------------
+function ambilData(key) {
+    return JSON.parse(localStorage.getItem(key)) || [];
+}
+function simpanData(key, data) {
+    localStorage.setItem(key, JSON.stringify(data));
+}
 
-        // ✅ KAMERA: DIPERBAIKI AGAR ZXING MUNCUL & MINTA IZIN
-        document.getElementById('btnBukaKamera').addEventListener('click', async function() {
-            try {
-                // Inisialisasi pembaca kode
-                codeReader = new ZXing.BrowserBarcodeReader();
-                // Langsung minta izin akses kamera ke HP
-                streamKamera = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: 'environment' }, // kamera belakang
-                    audio: false
-                });
-                videoKamera.srcObject = streamKamera;
-                modalKamera.style.display = 'flex';
-            } catch (err) {
-                alert('❌ Izin kamera ditolak atau tidak tersedia!');
-                console.error('Kamera error:', err);
-            }
-        });
+// -------------------- SISTEM SCAN DIPERBAIKI (ZXing DIPASTIKAN ADA) --------------------
+function mulaiScanBaru(dariHalaman) {
+    hentikanScan(); // Matikan dulu kalau ada yang nyala
 
-        function tutupKamera() {
-            if (streamKamera) {
-                streamKamera.getTracks().forEach(track => track.stop());
-                streamKamera = null;
-            }
-            if (codeReader) {
-                codeReader.reset();
-                codeReader = null;
-            }
-            modalKamera.style.display = 'none';
-        }
+    // Cek ulang apakah ZXing benar-benar ada
+    if (typeof ZXing === 'undefined') {
+        alert("❌ Kesalahan Sistem: Pustaka pembaca kode gagal dimuat. Cek koneksi internet atau muat ulang halaman.");
+        return;
+    }
 
-        function ambilFoto() {
-            if (codeReader) {
-                // Mulai memindai kode
-                codeReader.decodeOnceFromVideoDevice(undefined, 'videoKamera')
-                    .then(result => {
-                        alert('✅ BERHASIL SCAN: ' + result.text);
-                        tutupKamera();
-                    })
-                    .catch(err => {
-                        alert('⚠️ Tidak terbaca, coba lagi!');
-                        console.error(err);
-                    });
-            } else {
-                alert('⚠️ Kamera belum siap!');
-            }
-        }
+    let videoElem, areaKamera;
+    if(dariHalaman === 'transaksi') {
+        videoElem = document.getElementById('videoTransaksi');
+        areaKamera = document.getElementById('areaKameraTransaksi');
+    } else {
+        videoElem = document.getElementById('videoProduk');
+        areaKamera = document.getElementById('areaKameraProduk');
+    }
 
-        function hapusBaris(elemenBaris) {
-            barisAkanDihapus = elemenBaris;
-            modalPin.style.display = 'flex';
-            modalSimpan.style.display = 'none';
-            inputPin = '';
-            pinDisplay.textContent = '******';
-        }
+    areaKamera.classList.remove('hidden');
 
-        function tekanAngka(angka) {
-            if (inputPin.length < 6) {
-                inputPin += angka;
-                const idx = inputPin.length - 1;
-                pinDisplay.textContent = pinDisplay.textContent.replace('*', angka);
+    // 🔑 BAGIAN UTAMA: Panggil kamera standar browser
+    navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: "environment" } } // Paksa kamera BELAKANG
+    })
+    .then(function(stream) {
+        // Kalau dapat izin, tampilkan video
+        videoElem.srcObject = stream;
+        videoElem.play();
 
-                setTimeout(() => {
-                    const bintang = pinDisplay.textContent.split('');
-                    bintang[idx] = '*';
-                    pinDisplay.textContent = bintang.join('');
-                }, 300);
-            }
-        }
+        // Mulai baca kode
+        codeReader = new ZXing.BrowserBarcodeReader();
+        codeReader.setFormats([
+            ZXing.BarcodeFormat.EAN_13,
+            ZXing.BarcodeFormat.EAN_8,
+            ZXing.BarcodeFormat.CODE_128,
+            ZXing.BarcodeFormat.CODE_39,
+            ZXing.BarcodeFormat.QR_CODE
+        ]);
 
-        function hapusAngka() {
-            inputPin = '';
-            pinDisplay.textContent = '******';
-        }
-
-        function cekPin() {
-            // ✅ PIN TETAP 999
-            if (inputPin === '999') {
-                modalPin.style.display = 'none';
+        codeReader.decodeFromStream(stream, videoElem, (result, err) => {
+            if (result) {
+                let kode = result.text.trim();
+                alert("✅ BERHASIL TERBACA: " + kode);
                 
-                if(barisAkanDihapus !== null) {
-                    const b = parseInt(barisAkanDihapus.dataset.bayar);
-                    const t = parseInt(barisAkanDihapus.dataset.tagih);
-                    const kunciBulan = barisAkanDihapus.dataset.kunci;
-
-                    totalBayar -= b;
-                    totalTagihan -= t;
-                    saldoAkumulasi -= (b - t);
-
-                    if(dataPerBulan[kunciBulan]) {
-                        dataPerBulan[kunciBulan].bayar -= b;
-                        dataPerBulan[kunciBulan].tagih -= t;
-                        dataPerBulan[kunciBulan].saldo -= (b - t);
-                        dataPerBulan[kunciBulan].jumlahData -= 1;
-                    }
-
-                    barisAkanDihapus.remove();
-
-                    if(dataPerBulan[kunciBulan] && dataPerBulan[kunciBulan].jumlahData <= 0) {
-                        delete dataPerBulan[kunciBulan];
-                    }
-                    
-                    urutkanDanTampilkanSemuaData();
-                    perbaruiTampilanTotal();
-                    barisAkanDihapus = null;
-                } else {
-                    modalSimpan.style.display = 'flex';
-                    setTanggalHariIni();
-                    document.getElementById('pembayaran').value = "55000";
-                    document.getElementById('tagihan').value = "52447";
-                }
-            } else {
-                alert('❌ PIN SALAH!');
-                hapusAngka();
-            }
-        }
-
-        function simpanData() {
-            const nilaiBulanTahun = document.getElementById('bulanTahun').value;
-            const bayar = parseInt(document.getElementById('pembayaran').value) || 0;
-            const tagih = parseInt(document.getElementById('tagihan').value) || 0;
-
-            if (!nilaiBulanTahun) { alert('⚠️ BULAN & TAHUN WAJIB DIISI!'); return; }
-
-            const saldoBaris = bayar - tagih;
-            saldoAkumulasi += saldoBaris;
-            totalBayar += bayar;
-            totalTagihan += tagih;
-
-            const [thn, bln] = nilaiBulanTahun.split('-');
-            const namaBulanAngka = parseInt(bln);
-            const daftarNamaBulan = [
-                'JANUARI', 'FEBRUARI', 'MARET', 'APRIL', 'MEI', 'JUNI', 
-                'JULI', 'AGUSTUS', 'SEPTEMBER', 'OKTOBER', 'NOVEMBER', 'DESEMBER'
-            ];
-            const namaBulanNama = daftarNamaBulan[namaBulanAngka - 1];
-            const namaBulan = `${namaBulanNama} ${thn}`;
-
-            if(!dataPerBulan[nilaiBulanTahun]) {
-                dataPerBulan[nilaiBulanTahun] = { 
-                    nama: namaBulan, 
-                    bayar:0, tagih:0, saldo:0, jumlahData:0 
-                };
-            }
-            dataPerBulan[nilaiBulanTahun].bayar += bayar;
-            dataPerBulan[nilaiBulanTahun].tagih += tagih;
-            dataPerBulan[nilaiBulanTahun].saldo += saldoBaris;
-            dataPerBulan[nilaiBulanTahun].jumlahData += 1;
-
-            urutkanDanTampilkanSemuaData();
-
-            perbaruiTampilanTotal();
-
-            document.getElementById('bulanTahun').value = '';
-            document.getElementById('pembayaran').value = "55000";
-            document.getElementById('tagihan').value = "52447";
-            modalSimpan.style.display = 'none';
-        }
-
-        function urutkanDanTampilkanSemuaData() {
-            const wadah = document.getElementById('isiTabel');
-            wadah.innerHTML = '';
-
-            const kunciUrut = Object.keys(dataPerBulan).sort();
-
-            let akumulasiSementara = 0;
-
-            kunciUrut.forEach(kunci => {
-                const data = dataPerBulan[kunci];
+                if(dariHalaman === 'transaksi') tambahKeKeranjang(kode);
+                else document.getElementById('kodeProduk').value = kode;
                 
-                const barisNama = document.createElement('div');
-                barisNama.className = 'table-row';
-                barisNama.innerHTML = `<div class="table-cell nama-bulan" colspan="6">${data.nama}</div>`;
-                wadah.appendChild(barisNama);
-
-                akumulasiSementara += data.saldo;
-
-                const barisData = document.createElement('div');
-                barisData.className = 'table-row';
-                barisData.dataset.kunci = kunci;
-                barisData.dataset.bayar = data.bayar;
-                barisData.dataset.tagih = data.tagih;
-                barisData.innerHTML = `
-                    <div class="table-cell"></div>
-                    <div class="table-cell nilai-bayar">${data.bayar.toLocaleString('id-ID')}</div>
-                    <div class="table-cell nilai-tagih">${data.tagih.toLocaleString('id-ID')}</div>
-                    <div class="table-cell nilai-saldo">${data.saldo.toLocaleString('id-ID')}</div>
-                    <div class="table-cell"><span class="icon-hapus" onclick="hapusBaris(this.parentElement.parentElement)">🗑️</span></div>
-                    <div class="table-cell nilai-akm">${akumulasiSementara.toLocaleString('id-ID')}</div>
-                `;
-                wadah.appendChild(barisData);
-
-                const barisTotal = document.createElement('div');
-                barisTotal.className = 'table-total';
-                barisTotal.innerHTML = `
-                    <div class="table-cell">TOTAL</div>
-                    <div class="table-cell">${data.bayar.toLocaleString('id-ID')}</div>
-                    <div class="table-cell">${data.tagih.toLocaleString('id-ID')}</div>
-                    <div class="table-cell">${data.saldo.toLocaleString('id-ID')}</div>
-                    <div class="table-cell"></div>
-                    <div class="table-cell">${akumulasiSementara.toLocaleString('id-ID')}</div>
-                `;
-                wadah.appendChild(barisTotal);
-            });
+                hentikanScan();
+            }
+        });
+    })
+    .catch(function(err) {
+        // ❌ Kalau gagal, kasih tahu alasannya
+        console.error(err);
+        if(err.name === 'NotAllowedError') {
+            alert("❌ GAGAL! Anda MEMBLOKIR kamera.\n\nCaranya perbaiki:\n1. Ketuk ikon 🔒 di sebelah atas alamat web\n2. Pilih Izin/Permissions\n3. Ubah Kamera jadi IZINKAN/ALLOW\n4. Muat ulang halaman");
+        } else {
+            alert("❌ Tidak bisa buka kamera: " + err.message);
         }
+        hentikanScan();
+    });
+}
 
-        function perbaruiTampilanTotal() {
-            document.getElementById('totalBayar').textContent = `Rp ${totalBayar.toLocaleString('id-ID')}`;
-            document.getElementById('totalTagihan').textContent = `Rp ${totalTagihan.toLocaleString('id-ID')}`;
-            document.getElementById('saldoAkumulasi').textContent = `Rp ${saldoAkumulasi.toLocaleString('id-ID')}`;
-        }
+function hentikanScan() {
+    if (codeReader) { codeReader.reset(); codeReader = null; }
+    document.querySelectorAll('video').forEach(v => { if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); });
+    document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
+}
 
-        window.onclick = function(event) {
-            if (event.target === modalPin) { modalPin.style.display = 'none'; hapusAngka(); barisAkanDihapus=null; }
-            if (event.target === modalSimpan) modalSimpan.style.display = 'none';
-            if (event.target === modalKamera) tutupKamera();
-        }
-    </script>
+// -------------------- LOGIKA PRODUK --------------------
+function dapatkanKodeTerbaru() {
+    const produk = ambilData('produk');
+    return "A" + (produk.length + 1);
+}
+
+function simpanProdukBaru() {
+    let kode = document.getElementById('kodeProduk').value.trim();
+    if(!kode) kode = dapatkanKodeTerbaru();
+    
+    const data = {
+        kode: kode,
+        nama: document.getElementById('namaProduk').value,
+        beli: parseInt(document.getElementById('hargaBeli').value) || 0,
+        jual: parseInt(document.getElementById('hargaJual').value) || 0,
+        stok: parseInt(document.getElementById('stokProduk').value) || 0,
+        kategori: document.getElementById('kategoriProduk').value,
+        waktu: new Date().toLocaleString('id-ID')
+    };
+
+    const daftarProduk = ambilData('produk');
+    daftarProduk.push(data);
+    simpanData('produk', daftarProduk);
+
+    alert("✅ Produk Berhasil Disimpan!");
+    document.getElementById('kodeProduk').value = "";
+    document.getElementById('namaProduk').value = "";
+    document.getElementById('hargaBeli').value = "";
+    document.getElementById('hargaJual').value = "";
+    document.getElementById('stokProduk').value = "";
+    tampilkanDaftarProduk();
+}
+
+function cariProduk(keyword) {
+    const daftarProduk = ambilData('produk');
+    keyword = keyword.toLowerCase();
+    return daftarProduk.filter(item => item.kode.toLowerCase().includes(keyword) || item.nama.toLowerCase().includes(keyword));
+}
+
+function tampilkanDaftarProduk() {
+    const kata = document.getElementById('kataCariProduk')?.value || "";
+    const hasil = cariProduk(kata);
+    const el = document.getElementById('daftarProduk');
+    if(hasil.length === 0) return el.innerHTML = "<p class='text-gray-500 text-center'>Tidak ada data</p>";
+    el.innerHTML = "";
+    hasil.forEach(item => {
+        el.innerHTML += `
+        <div class="border-b py-2 px-1 hover:bg-blue-50 rounded">
+            <div class="flex justify-between items-start"><span class="font-mono bg-blue-100 px-2 rounded font-bold">${item.kode}</span><span class="font-semibold">Stok: ${item.stok}</span></div>
+            <div>${item.nama}</div>
+            <div class="text-xs text-gray-600">Harga: Rp ${item.jual.toLocaleString('id-ID')}</div>
+        </div>`;
+    });
+}
+
+// -------------------- LOGIKA TRANSAKSI --------------------
+function cariDanTampilkanProduk() {
+    const kata = document.getElementById('kataCariTransaksi').value;
+    const hasil = cariProduk(kata);
+    const el = document.getElementById('hasilCariTransaksi');
+    el.innerHTML = "";
+    hasil.forEach(item => {
+        el.innerHTML += `<div class="border-b py-1 flex justify-between items-center"><span>${item.kode} - ${item.nama}</span><button onclick="tambahKeKeranjang('${item.kode}')" class="text-blue-600 font-bold">+ Tambah</button></div>`;
+    });
+}
+
+function tambahKeKeranjang(kode) {
+    const hasil = cariProduk(kode);
+    if(hasil.length === 0) return alert("Produk tidak ada di database!");
+    const p = hasil[0];
+    keranjang.push({ kode:p.kode, nama:p.nama, harga:p.jual, qty:1 });
+    updateTampilanKeranjang();
+}
+
+function updateTampilanKeranjang() {
+    const el = document.getElementById('daftarKeranjang');
+    if(keranjang.length === 0) {
+        el.innerHTML = "<p class='text-gray-500 text-center py-2'>Belum ada barang</p>";
+    } else {
+        el.innerHTML = "";
+        totalBayar = 0;
+        keranjang.forEach((item, idx) => {
+            const subtotal = item.harga * item.qty;
+            totalBayar += subtotal;
+            el.innerHTML += `
+            <div class="flex justify-between items-center"><span>${item.nama}</span><div><button onclick="ubahQty(${idx}, -1)" class="px-1 bg-gray-200 rounded">-</button><span>${item.qty}</span><button onclick="ubahQty(${idx}, 1)" class="px-1 bg-gray-200 rounded">+</button><span class="ml-2">Rp ${subtotal.toLocaleString('id-ID')}</span><button onclick="hapusItem(${idx})" class="text-red-500 ml-2 text-xs">✕</button></div></div>`;
+        });
+    }
+    document.getElementById('labelTotal').innerText = "Rp " + totalBayar.toLocaleString('id-ID');
+    hitungKembalian();
+}
+
+function ubahQty(index, nilai) {
+    keranjang[index].qty += nilai;
+    if(keranjang[index].qty < 1) keranjang[index].qty = 1;
+    updateTampilanKeranjang();
+}
+
+function hapusItem(index) {
+    keranjang.splice(index, 1);
+    updateTampilanKeranjang();
+}
+
+function hitungKembalian() {
+    const bayar = parseInt(document.getElementById('uangBayar').value) || 0;
+    const kembali = bayar - totalBayar;
+    document.getElementById('labelKembalian').innerText = "Rp " + kembali.toLocaleString('id-ID');
+}
+
+function prosesTransaksi() {
+    if(keranjang.length === 0) return alert("Keranjang masih kosong!");
+    const bayar = parseInt(document.getElementById('uangBayar').value) || 0;
+    if(bayar < totalBayar) return alert("Uang kurang!");
+
+    const dataTransaksi = {
+        tanggal: new Date().toLocaleString('id-ID'),
+        items: keranjang,
+        total: totalBayar,
+        bayar: bayar,
+        kembali: bayar - totalBayar
+    };
+
+    const daftarTransaksi = ambilData('transaksi');
+    daftarTransaksi.push(dataTransaksi);
+    simpanData('transaksi', daftarTransaksi);
+
+    alert("✅ Transaksi Berhasil Disimpan!");
+    keranjang = [];
+    totalBayar = 0;
+    document.getElementById('uangBayar').value = "";
+    updateTampilanKeranjang();
+    tampilkanLaporan();
+}
+
+// -------------------- LOGIKA LAPORAN --------------------
+function tampilkanLaporan() {
+    const daftarTransaksi = ambilData('transaksi');
+    let totalHari = 0;
+    let jmlTrx = daftarTransaksi.length;
+    const hariIni = new Date().toLocaleDateString('id-ID');
+
+    const elRiwayat = document.getElementById('riwayatTransaksi');
+    elRiwayat.innerHTML = "";
+
+    daftarTransaksi.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(trx => {
+        const tglTrx = new Date(trx.tanggal).toLocaleDateString('id-ID');
+        if(tglTrx === hariIni) totalHari += trx.total;
+        elRiwayat.innerHTML += `<div class="border-b py-2"><div class="font-semibold">${trx.tanggal}</div><div>Total: Rp ${trx.total.toLocaleString('id-ID')}</div></div>`;
+    });
+
+    document.getElementById('jmlTransaksiHari').innerText = jmlTrx;
+    document.getElementById('pendapatanHari').innerText = "Rp " + totalHari.toLocaleString('id-ID');
+}
+</script>
 </body>
 </html>
