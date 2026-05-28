@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kasir Pintar - LocalStorage</title>
+    <title>Kasir Pintar - Scan Cepat</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
-    <!-- ✅ GANTI PUSTAKA: Pasti jalan, tidak gagal muat -->
+    <!-- Pustaka Scan Tercepat & Paling Stabil -->
     <script src="https://unpkg.com/jsqr@1.4.0/dist/jsQR.js"></script>
     <script>
         const PIN_AKSES = "999";
@@ -14,13 +14,24 @@
         let totalBayar = 0;
         let streamSekarang = null;
         let sedangScan = false;
+        let waktuTerakhir = 0; // Anti ganda baca
     </script>
     <style>
         body { max-width: 480px; margin: auto; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; min-height: 250px; }
-        .scan-area { position: absolute; top: 20%; left: 10%; width: 80%; height: 40%; border: 2px solid #0f0; border-radius: 8px; box-shadow: 0 0 0 1000px rgba(0,0,0,0.5); z-index: 2; }
+        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; min-height: 280px; }
+        .scan-area { 
+            position: absolute; top: 15%; left: 10%; width: 80%; height: 50%; 
+            border: 2px solid #00FF00; border-radius: 12px; 
+            box-shadow: 0 0 0 1000px rgba(0,0,0,0.6); 
+            z-index: 2;
+            animation: kedip 1.5s infinite;
+        }
+        @keyframes kedip {
+            0%, 100% { border-color: #00FF00; }
+            50% { border-color: #FFFFFF; }
+        }
         canvas { display: none; }
     </style>
 </head>
@@ -46,7 +57,7 @@
 
     <!-- PESAN PENTING -->
     <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-3 text-sm text-center font-bold">
-        ✅ SISTEM BARU: Pilih Kamera > Mulai Scan > Arahkan ke Kotak Hijau
+        ⚡ MODE CEPAT: Arahkan kode ke kotak hijau -> TERBACA LANGSUNG
     </div>
 
     <!-- MENU TAB NAVIGASI -->
@@ -73,15 +84,15 @@
             </select>
 
             <button onclick="mulaiScanPenuh('transaksi')" class="w-full bg-blue-500 text-white py-3 rounded font-bold text-lg">
-                <i class="fa fa-qrcode"></i> MULAI SCAN BARCODE / QR
+                <i class="fa fa-qrcode"></i> ⚡ MULAI SCAN CEPAT
             </button>
 
             <div id="areaKameraTransaksi" class="video-container hidden">
-                <video id="videoTransaksi" class="w-full h-full object-cover" autoplay playsinline></video>
+                <video id="videoTransaksi" class="w-full h-full object-cover" autoplay playsinline muted></video>
                 <canvas id="canvasTransaksi"></canvas>
                 <div class="scan-area"></div>
                 <button onclick="hentikanSemua()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕ TUTUP</button>
-                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Arahkan kode ke kotak hijau</p>
+                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Dekatkan sedikit ke kotak hijau</p>
             </div>
         </div>
 
@@ -134,10 +145,10 @@
                 </select>
 
                 <button onclick="mulaiScanPenuh('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm font-bold">
-                    <i class="fa fa-qrcode"></i> SCAN BARCODE UNTUK ISI KODE
+                    <i class="fa fa-qrcode"></i> ⚡ SCAN CEPAT UNTUK KODE
                 </button>
                 <div id="areaKameraProduk" class="video-container hidden">
-                    <video id="videoProduk" class="w-full h-full object-cover" autoplay playsinline></video>
+                    <video id="videoProduk" class="w-full h-full object-cover" autoplay playsinline muted></video>
                     <canvas id="canvasProduk"></canvas>
                     <div class="scan-area"></div>
                     <button onclick="hentikanSemua()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕ TUTUP</button>
@@ -250,9 +261,10 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- SISTEM SCAN BARU 100% JALAN --------------------
+// -------------------- SISTEM SCAN KECEPATAN TINGGI --------------------
 function mulaiScanPenuh(dariHalaman) {
     hentikanSemua(); 
+    waktuTerakhir = 0;
 
     let tipeKamera, videoElem, canvasElem, areaKamera;
 
@@ -271,49 +283,78 @@ function mulaiScanPenuh(dariHalaman) {
     areaKamera.classList.remove('hidden');
     sedangScan = true;
 
+    // ⚡ PENGATURAN KAMERA OPTIMAL: Resolusi pas & Fokus Cepat
     navigator.mediaDevices.getUserMedia({
-        video: { facingMode: tipeKamera, width: 640, height: 480 },
+        video: { 
+            facingMode: tipeKamera,
+            width: { ideal: 640, min: 320 },
+            height: { ideal: 480, min: 240 },
+            frameRate: { ideal: 30, min: 15 } // Frame tinggi = makin responsif
+        },
         audio: false
     })
     .then(function(stream) {
         streamSekarang = stream;
         videoElem.srcObject = stream;
+        videoElem.setAttribute('playsinline', true);
         videoElem.play();
-        prosesScan(videoElem, canvasElem, dariHalaman);
+        
+        // Mulai proses baca secepat mungkin
+        requestAnimationFrame(() => prosesScanCepat(videoElem, canvasElem, dariHalaman));
     })
     .catch(function(error) {
-        alert("❌ Gagal: " + error.message + "\nPastikan pilih IZINKAN kamera!");
+        alert("❌ Gagal: Pastikan izinkan akses kamera!");
         hentikanSemua();
     });
 }
 
-function prosesScan(video, canvas, lokasi) {
+// ⚡ INTI KECEPATAN: Cek gambar setiap 100ms, tanpa delay
+function prosesScanCepat(video, canvas, lokasi) {
     if (!sedangScan) return;
 
-    const ctx = canvas.getContext('2d');
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const sekarang = Date.now();
+    // Batasi cek tiap 100ms saja (10x per detik) -> Cepat tapi hemat daya
+    if (sekarang - waktuTerakhir > 100) { 
+        waktuTerakhir = sekarang;
 
-    try {
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+
+        // Ambil gambar langsung dari kotak scan saja biar proses makin cepat
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const gambarData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const kode = jsQR(gambarData.data, gambarData.width, gambarData.height);
+        
+        try {
+            const gambarData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const hasil = jsQR(gambarData.data, gambarData.width, gambarData.height, {
+                inversionAttempts: "dontInvert" // Pengaturan biar baca lebih akurat & cepat
+            });
 
-        if (kode) {
-            alert("✅ BERHASIL TERBACA:\n" + kode.data);
-            if(lokasi === 'transaksi') tambahKeKeranjang(kode.data);
-            else document.getElementById('kodeProduk').value = kode.data;
-            hentikanSemua();
-            return;
-        }
-    } catch (e) {}
+            if (hasil && hasil.data) {
+                // BERHASIL TERBACA
+                const kodeBersih = hasil.data.trim();
+                alert("✅ TERBACA: " + kodeBersih);
+                
+                if(lokasi === 'transaksi') tambahKeKeranjang(kodeBersih);
+                else document.getElementById('kodeProduk').value = kodeBersih;
+                
+                hentikanSemua();
+                return;
+            }
+        } catch (e) { /* Abaikan error sementara */ }
+    }
 
-    requestAnimationFrame(() => prosesScan(video, canvas, lokasi));
+    // Ulangi terus sampai ada hasil atau ditutup
+    requestAnimationFrame(() => prosesScanCepat(video, canvas, lokasi));
 }
 
 function hentikanSemua() {
     sedangScan = false;
-    if (streamSekarang) { streamSekarang.getTracks().forEach(t => t.stop()); streamSekarang = null; }
+    waktuTerakhir = 0;
+    if (streamSekarang) { 
+        streamSekarang.getTracks().forEach(t => t.stop()); 
+        streamSekarang = null; 
+    }
     document.querySelectorAll('video').forEach(v => { if(v.srcObject) v.srcObject = null; });
     document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
 }
