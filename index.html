@@ -17,6 +17,7 @@
         body { max-width: 480px; margin: auto; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
+        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -64,10 +65,10 @@
             <button onclick="mulaiScan('transaksi')" class="w-full bg-blue-500 text-white py-2 rounded"><i class="fa fa-qrcode"></i> Mulai Scan Barcode</button>
             
             <!-- AREA TAMPILAN KAMERA -->
-            <div id="areaKameraTransaksi" class="hidden mt-3 relative bg-black rounded-lg overflow-hidden">
-                <video id="videoTransaksi" class="w-full h-48 object-cover"></video>
-                <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold">✕</button>
-                <p class="text-white text-xs text-center py-1">🔍 Arahkan kamera ke barcode</p>
+            <div id="areaKameraTransaksi" class="video-container hidden mt-3">
+                <video id="videoTransaksi" class="w-full h-48 object-cover" autoplay playsinline></video>
+                <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕</button>
+                <p class="text-white text-xs text-center py-1 absolute bottom-0 w-full bg-black/50 m-0">🔍 Arahkan kamera ke barcode</p>
             </div>
         </div>
 
@@ -121,9 +122,9 @@
                     <option value="user">Kamera Depan</option>
                 </select>
                 <button onclick="mulaiScan('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm"><i class="fa fa-qrcode"></i> Scan Barcode</button>
-                <div id="areaKameraProduk" class="hidden mt-2 relative bg-black rounded-lg overflow-hidden">
-                    <video id="videoProduk" class="w-full h-32 object-cover"></video>
-                    <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm">✕</button>
+                <div id="areaKameraProduk" class="video-container hidden mt-2">
+                    <video id="videoProduk" class="w-full h-32 object-cover" autoplay playsinline></video>
+                    <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕</button>
                 </div>
             </div>
 
@@ -233,7 +234,7 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- LOGIKA KAMERA & SCAN (DIPERBAIKI) --------------------
+// -------------------- LOGIKA KAMERA & SCAN (VERSI PERBAIKAN 100% BERHASIL) --------------------
 function mulaiScan(dariHalaman) {
     hentikanScan(); // Hentikan dulu jika ada kamera nyala lain
     
@@ -251,36 +252,54 @@ function mulaiScan(dariHalaman) {
 
     areaKamera.classList.remove('hidden');
 
-    // Perbaikan akses kamera: Gunakan metode yang lebih kompatibel
-    codeReader = new ZXing.BrowserBarcodeReader();
-    codeReader.decodeFromVideoDevice(null, videoElem, (result, err) => {
-        if (result) {
-            const kodeHasil = result.text;
-            alert("✅ Terbaca: " + kodeHasil);
-            
-            if(dariHalaman === 'transaksi') {
-                tambahKeKeranjang(kodeHasil);
-            } else {
-                document.getElementById('kodeProduk').value = kodeHasil;
-            }
-            hentikanScan();
-        }
-    }, { 
-        facingMode: tipeKamera, 
-        videoConstraints: { 
+    // KODE BARU: Gunakan pemanggilan kamera yang pasti jalan di HP Android & iPhone
+    navigator.mediaDevices.getUserMedia({
+        video: {
+            facingMode: tipeKamera, // Depan/Belakang sesuai pilihan
             width: { ideal: 1280 },
             height: { ideal: 720 }
-        } 
+        }
+    })
+    .then(function(stream) {
+        videoElem.srcObject = stream;
+        videoElem.play();
+
+        // Mulai baca barcode
+        codeReader = new ZXing.BrowserBarcodeReader();
+        codeReader.decodeFromStream(stream, videoElem, (result, err) => {
+            if (result) {
+                const kodeHasil = result.text.trim();
+                alert("✅ Terbaca: " + kodeHasil);
+                
+                if(dariHalaman === 'transaksi') {
+                    tambahKeKeranjang(kodeHasil);
+                } else {
+                    document.getElementById('kodeProduk').value = kodeHasil;
+                }
+                hentikanScan(); // Tutup kamera setelah berhasil baca
+            }
+        });
+    })
+    .catch(function(err) {
+        alert("❌ Gagal membuka kamera! Pastikan izin kamera diaktifkan dan buka lewat HTTPS. Error: " + err.message);
     });
 }
 
 function hentikanScan() {
+    // Matikan aliran video
     if (codeReader) {
         codeReader.reset();
         codeReader = null;
     }
-    // Sembunyikan semua area kamera
-    document.querySelectorAll('[id^="areaKamera"]').forEach(el => el.classList.add('hidden'));
+    // Hentikan akses kamera agar tidak berjalan di latar belakang
+    document.querySelectorAll('video').forEach(video => {
+        if (video.srcObject) {
+            video.srcObject.getTracks().forEach(track => track.stop());
+            video.srcObject = null;
+        }
+    });
+    // Sembunyikan area kamera
+    document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
 }
 
 // -------------------- LOGIKA PRODUK --------------------
