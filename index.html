@@ -8,7 +8,7 @@
     <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
     <script src="https://unpkg.com/@zxing/library@0.19.1/dist/zxing.min.js"></script>
     <script>
-        const PIN_AKSES = "999"; // PIN akses aplikasi
+        const PIN_AKSES = "999";
         let codeReader;
         let keranjang = [];
         let totalBayar = 0;
@@ -17,7 +17,7 @@
         body { max-width: 480px; margin: auto; }
         .tab-content { display: none; }
         .tab-content.active { display: block; }
-        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; }
+        .video-container { position: relative; width: 100%; overflow: hidden; border-radius: 8px; background: #000; margin: 8px 0; min-height: 200px; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -40,9 +40,9 @@
         <button onclick="keluarAplikasi()" class="text-sm bg-white/20 px-2 py-1 rounded"><i class="fa fa-sign-out"></i></button>
     </header>
 
-    <!-- PESAN PENTING IZIN KAMERA -->
-    <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-2 text-sm text-center">
-        <b>⚠️ Catatan:</b> Saat tombol diklik, pilih <b>"Izinkan"</b> jika Chrome minta akses kamera.
+    <!-- PESAN PENTING -->
+    <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 text-sm text-center font-bold">
+        ⚠️ PENTING: Saat tombol diklik, <u>WAJIB PILIH IZINKAN</u> di notifikasi Chrome agar kamera jalan!
     </div>
 
     <!-- MENU TAB NAVIGASI -->
@@ -60,20 +60,14 @@
 
     <!-- =============== HALAMAN TRANSAKSI =============== -->
     <div id="transaksi" class="tab-content active p-4">
-        <!-- PILIH KAMERA & SCAN -->
         <div class="bg-white rounded-lg shadow p-3 mb-4">
-            <label class="font-semibold text-sm">Pilih Kamera Scan:</label>
-            <select id="tipeKameraTransaksi" class="w-full border p-2 rounded mt-1 mb-2">
-                <option value="environment">Kamera Belakang</option>
-                <option value="user">Kamera Depan</option>
-            </select>
-            <button onclick="mulaiScan('transaksi')" class="w-full bg-blue-500 text-white py-2 rounded"><i class="fa fa-qrcode"></i> Mulai Scan Barcode</button>
-            
-            <!-- AREA TAMPILAN KAMERA -->
+            <button onclick="mulaiScanBaru('transaksi')" class="w-full bg-blue-500 text-white py-3 rounded font-bold text-lg">
+                <i class="fa fa-qrcode"></i> MULAI SCAN BARCODE
+            </button>
             <div id="areaKameraTransaksi" class="video-container hidden">
-                <video id="videoTransaksi" class="w-full h-48 object-cover" autoplay playsinline></video>
-                <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕</button>
-                <p class="text-white text-xs text-center py-1 absolute bottom-0 w-full bg-black/50 m-0">🔍 Arahkan ke kode batang</p>
+                <video id="videoTransaksi" class="w-full h-full object-cover" autoplay playsinline></video>
+                <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-8 h-8 rounded-full flex items-center justify-center font-bold z-10">✕ TUTUP</button>
+                <p class="text-white text-sm text-center py-1 absolute bottom-0 w-full bg-black/70 m-0">🔍 Arahkan ke kode</p>
             </div>
         </div>
 
@@ -115,21 +109,16 @@
 
     <!-- =============== HALAMAN INPUT PRODUK =============== -->
     <div id="produk" class="tab-content p-4">
-        <!-- FORM TAMBAH PRODUK -->
         <div class="bg-white rounded-lg shadow p-4 mb-6">
             <h3 class="font-bold text-lg mb-3">➕ Tambah Produk Baru</h3>
             
-            <!-- FITUR SCAN DI INPUT PRODUK -->
             <div class="bg-blue-50 p-3 rounded-lg mb-4 border border-blue-200">
-                <label class="font-semibold text-sm">Scan Barcode Isi Kode:</label>
-                <select id="tipeKameraProduk" class="w-full border p-2 rounded mt-1 mb-2">
-                    <option value="environment">Kamera Belakang</option>
-                    <option value="user">Kamera Depan</option>
-                </select>
-                <button onclick="mulaiScan('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm"><i class="fa fa-qrcode"></i> Scan Barcode</button>
+                <button onclick="mulaiScanBaru('produk')" class="w-full bg-blue-500 text-white py-2 rounded text-sm font-bold">
+                    <i class="fa fa-qrcode"></i> SCAN BARCODE UNTUK KODE
+                </button>
                 <div id="areaKameraProduk" class="video-container hidden">
-                    <video id="videoProduk" class="w-full h-32 object-cover" autoplay playsinline></video>
-                    <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕</button>
+                    <video id="videoProduk" class="w-full h-full object-cover" autoplay playsinline></video>
+                    <button onclick="hentikanScan()" class="absolute top-2 right-2 bg-red-500 text-white w-7 h-7 rounded-full flex items-center justify-center text-sm z-10">✕ TUTUP</button>
                 </div>
             </div>
 
@@ -239,77 +228,59 @@ function simpanData(key, data) {
     localStorage.setItem(key, JSON.stringify(data));
 }
 
-// -------------------- LOGIKA KAMERA & SCAN (VERSI FINAL BERHASIL) --------------------
-function mulaiScan(dariHalaman) {
-    hentikanScan(); // Pastikan kamera lain mati dulu
-    
-    let tipeKamera, videoElem, areaKamera;
+// -------------------- SISTEM SCAN PALING DASAR & AMAN --------------------
+function mulaiScanBaru(dariHalaman) {
+    hentikanScan(); // Matikan dulu kalau ada yang nyala
 
-    // Tentukan elemen berdasarkan halaman
+    let videoElem, areaKamera;
     if(dariHalaman === 'transaksi') {
-        tipeKamera = document.getElementById('tipeKameraTransaksi').value;
         videoElem = document.getElementById('videoTransaksi');
         areaKamera = document.getElementById('areaKameraTransaksi');
     } else {
-        tipeKamera = document.getElementById('tipeKameraProduk').value;
         videoElem = document.getElementById('videoProduk');
         areaKamera = document.getElementById('areaKameraProduk');
     }
 
     areaKamera.classList.remove('hidden');
 
-    // Inisialisasi Pembaca Kode
-    codeReader = new ZXing.BrowserBarcodeReader();
-    // SETING PENTING: Tambahkan format kode agar lebih cepat terbaca
-    codeReader.setFormats([
-        ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.EAN_13,
-        ZXing.BarcodeFormat.EAN_8,
-        ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.QR_CODE
-    ]);
+    // 🔑 BAGIAN UTAMA: Panggil kamera standar browser
+    navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { exact: "environment" } } // Paksa kamera BELAKANG
+    })
+    .then(function(stream) {
+        // Kalau dapat izin, tampilkan video
+        videoElem.srcObject = stream;
+        videoElem.play();
 
-    // Mulai akses kamera
-    codeReader.decodeFromVideoDevice(undefined, videoElem, (result, error) => {
-        if (result) {
-            // KODE BERHASIL DIBACA
-            const kodeHasil = result.text.trim();
-            alert("✅ Terbaca: " + kodeHasil);
-
-            // Lakukan aksi sesuai halaman
-            if(dariHalaman === 'transaksi') {
-                tambahKeKeranjang(kodeHasil);
-            } else {
-                document.getElementById('kodeProduk').value = kodeHasil;
+        // Mulai baca kode
+        codeReader = new ZXing.BrowserBarcodeReader();
+        codeReader.decodeFromStream(stream, videoElem, (result, err) => {
+            if (result) {
+                let kode = result.text.trim();
+                alert("✅ BERHASIL: " + kode);
+                
+                if(dariHalaman === 'transaksi') tambahKeKeranjang(kode);
+                else document.getElementById('kodeProduk').value = kode;
+                
+                hentikanScan();
             }
-            
-            hentikanScan(); // Tutup kamera otomatis setelah baca
+        });
+    })
+    .catch(function(err) {
+        // ❌ Kalau gagal, kasih tahu alasannya
+        console.error(err);
+        if(err.name === 'NotAllowedError') {
+            alert("❌ GAGAL! Anda MEMBLOKIR kamera.\n\nCaranya perbaiki:\n1. Ketuk ikon 🔒 di sebelah atas alamat web\n2. Pilih Izin/Permissions\n3. Ubah Kamera jadi IZINKAN/ALLOW\n4. Muat ulang halaman");
+        } else {
+            alert("❌ Tidak bisa buka kamera: " + err.message + "\nKemungkinan HP tidak mendukung atau ada aplikasi lain pakai kamera.");
         }
-        // Tampilkan pesan jika akses ditolak
-        if (error && error.name === 'NotAllowedError') {
-            alert("❌ Izin kamera DITOLAK! Ubah izin di pengaturan Chrome > Kamera > Izinkan.");
-            hentikanScan();
-        }
-    }, {
-        facingMode: tipeKamera, // Depan/Belakang
-        width: { min: 640, ideal: 1280, max: 1920 },
-        height: { min: 480, ideal: 720, max: 1080 }
+        hentikanScan();
     });
 }
 
 function hentikanScan() {
-    if (codeReader) {
-        codeReader.reset(); // Matikan pembaca
-        codeReader = null;
-    }
-    // Matikan aliran video
-    document.querySelectorAll('video').forEach(video => {
-        if (video.srcObject) {
-            video.srcObject.getTracks().forEach(track => track.stop());
-            video.srcObject = null;
-        }
-    });
-    // Sembunyikan kotak kamera
+    if (codeReader) { codeReader.reset(); codeReader = null; }
+    document.querySelectorAll('video').forEach(v => { if(v.srcObject) v.srcObject.getTracks().forEach(t => t.stop()); });
     document.querySelectorAll('.video-container').forEach(el => el.classList.add('hidden'));
 }
 
@@ -321,11 +292,7 @@ function dapatkanKodeTerbaru() {
 
 function simpanProdukBaru() {
     let kode = document.getElementById('kodeProduk').value.trim();
-    
-    // Jika kode kosong, ambil otomatis A1, A2...
-    if(!kode) {
-        kode = dapatkanKodeTerbaru();
-    }
+    if(!kode) kode = dapatkanKodeTerbaru();
     
     const data = {
         kode: kode,
@@ -337,13 +304,11 @@ function simpanProdukBaru() {
         waktu: new Date().toLocaleString('id-ID')
     };
 
-    // Simpan ke LocalStorage
     const daftarProduk = ambilData('produk');
     daftarProduk.push(data);
     simpanData('produk', daftarProduk);
 
     alert("✅ Produk Berhasil Disimpan!");
-    // Reset form
     document.getElementById('kodeProduk').value = "";
     document.getElementById('namaProduk').value = "";
     document.getElementById('hargaBeli').value = "";
@@ -355,27 +320,19 @@ function simpanProdukBaru() {
 function cariProduk(keyword) {
     const daftarProduk = ambilData('produk');
     keyword = keyword.toLowerCase();
-    return daftarProduk.filter(item => 
-        item.kode.toLowerCase().includes(keyword) || 
-        item.nama.toLowerCase().includes(keyword)
-    );
+    return daftarProduk.filter(item => item.kode.toLowerCase().includes(keyword) || item.nama.toLowerCase().includes(keyword));
 }
 
 function tampilkanDaftarProduk() {
     const kata = document.getElementById('kataCariProduk')?.value || "";
     const hasil = cariProduk(kata);
-    
     const el = document.getElementById('daftarProduk');
     if(hasil.length === 0) return el.innerHTML = "<p class='text-gray-500 text-center'>Tidak ada data</p>";
-    
     el.innerHTML = "";
     hasil.forEach(item => {
         el.innerHTML += `
         <div class="border-b py-2 px-1 hover:bg-blue-50 rounded">
-            <div class="flex justify-between items-start">
-                <span class="font-mono bg-blue-100 px-2 rounded font-bold">${item.kode}</span>
-                <span class="font-semibold">Stok: ${item.stok}</span>
-            </div>
+            <div class="flex justify-between items-start"><span class="font-mono bg-blue-100 px-2 rounded font-bold">${item.kode}</span><span class="font-semibold">Stok: ${item.stok}</span></div>
             <div>${item.nama}</div>
             <div class="text-xs text-gray-600">Harga: Rp ${item.jual.toLocaleString('id-ID')}</div>
         </div>`;
@@ -386,15 +343,10 @@ function tampilkanDaftarProduk() {
 function cariDanTampilkanProduk() {
     const kata = document.getElementById('kataCariTransaksi').value;
     const hasil = cariProduk(kata);
-    
     const el = document.getElementById('hasilCariTransaksi');
     el.innerHTML = "";
     hasil.forEach(item => {
-        el.innerHTML += `
-        <div class="border-b py-1 flex justify-between items-center">
-            <span>${item.kode} - ${item.nama}</span>
-            <button onclick="tambahKeKeranjang('${item.kode}')" class="text-blue-600 font-bold">+ Tambah</button>
-        </div>`;
+        el.innerHTML += `<div class="border-b py-1 flex justify-between items-center"><span>${item.kode} - ${item.nama}</span><button onclick="tambahKeKeranjang('${item.kode}')" class="text-blue-600 font-bold">+ Tambah</button></div>`;
     });
 }
 
@@ -417,16 +369,7 @@ function updateTampilanKeranjang() {
             const subtotal = item.harga * item.qty;
             totalBayar += subtotal;
             el.innerHTML += `
-            <div class="flex justify-between items-center">
-                <span>${item.nama}</span>
-                <div>
-                    <button onclick="ubahQty(${idx}, -1)" class="px-1 bg-gray-200 rounded">-</button>
-                    <span>${item.qty}</span>
-                    <button onclick="ubahQty(${idx}, 1)" class="px-1 bg-gray-200 rounded">+</button>
-                    <span class="ml-2">Rp ${subtotal.toLocaleString('id-ID')}</span>
-                    <button onclick="hapusItem(${idx})" class="text-red-500 ml-2 text-xs">✕</button>
-                </div>
-            </div>`;
+            <div class="flex justify-between items-center"><span>${item.nama}</span><div><button onclick="ubahQty(${idx}, -1)" class="px-1 bg-gray-200 rounded">-</button><span>${item.qty}</span><button onclick="ubahQty(${idx}, 1)" class="px-1 bg-gray-200 rounded">+</button><span class="ml-2">Rp ${subtotal.toLocaleString('id-ID')}</span><button onclick="hapusItem(${idx})" class="text-red-500 ml-2 text-xs">✕</button></div></div>`;
         });
     }
     document.getElementById('labelTotal').innerText = "Rp " + totalBayar.toLocaleString('id-ID');
@@ -463,7 +406,6 @@ function prosesTransaksi() {
         kembali: bayar - totalBayar
     };
 
-    // Simpan ke LocalStorage
     const daftarTransaksi = ambilData('transaksi');
     daftarTransaksi.push(dataTransaksi);
     simpanData('transaksi', daftarTransaksi);
@@ -489,12 +431,7 @@ function tampilkanLaporan() {
     daftarTransaksi.sort((a,b) => new Date(b.tanggal) - new Date(a.tanggal)).forEach(trx => {
         const tglTrx = new Date(trx.tanggal).toLocaleDateString('id-ID');
         if(tglTrx === hariIni) totalHari += trx.total;
-
-        elRiwayat.innerHTML += `
-        <div class="border-b py-2">
-            <div class="font-semibold">${trx.tanggal}</div>
-            <div>Total: Rp ${trx.total.toLocaleString('id-ID')}</div>
-        </div>`;
+        elRiwayat.innerHTML += `<div class="border-b py-2"><div class="font-semibold">${trx.tanggal}</div><div>Total: Rp ${trx.total.toLocaleString('id-ID')}</div></div>`;
     });
 
     document.getElementById('jmlTransaksiHari').innerText = jmlTrx;
